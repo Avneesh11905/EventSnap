@@ -1,0 +1,25 @@
+name: enventsnap-dev
+
+x-env-file: &env-file
+  - .env
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio-dev
+    command: server /data --console-address ":9001"
+    env_file: *env-file
+    volumes:
+      - ./minio_data:/data
+    ports:
+      - "9001:9001" 
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://minio:9000/minio/health/live"]
+    restart: unless-stopped
+    networks:
+      - enventsnap-network
+
+networks:
+  enventsnap-network:
+    driver: bridge

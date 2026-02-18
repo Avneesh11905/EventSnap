@@ -1,0 +1,55 @@
+{
+  "name": "eventsnap",
+  "version": "0.1.0",
+  "overrides": {
+    "fast-xml-parser": "5.3.8"
+  },
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.997.0",
+    "@aws-sdk/s3-request-presigner": "^3.999.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@uppy/aws-s3": "^5.1.0",
+    "@uppy/core": "^5.2.0",
+    "@uppy/drag-drop": "^5.1.0",
+    "@uppy/react": "^5.2.0",
+    "axios": "^1.13.5",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "framer-motion": "^13.1.0",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.460.0",
+    "next": "^16.2.10",
+    "next-auth": "^4.24.14",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
+    "@prisma/client": "^5.22.0",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.1.6",
+    "postcss": "^8",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  },
+  "allowScripts": {
+    "@prisma/client@2.30.3": true,
+    "es5-ext@0.10.64": true,
+    "unrs-resolver@1.11.1": true,
+    "sharp@0.34.5": true
+  }
+}
