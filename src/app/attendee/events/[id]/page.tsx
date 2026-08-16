@@ -306,6 +306,7 @@ export default function AttendeeEventDetail() {
                                 src={photo.url}
                                 alt={photo.filename}
                                 fill
+                                unoptimized
                                 className={`object-cover transition-all duration-500 group-hover:scale-105 ${loadedImages.has(i) ? "opacity-100" : "opacity-0"}`}
                                 sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
                                 loading={i < 8 ? "eager" : "lazy"}
@@ -347,11 +348,12 @@ export default function AttendeeEventDetail() {
                         <X size={20} />
                     </button>
 
-                    <div className="relative w-full max-w-4xl max-h-[85vh] aspect-auto">
+                    <div className="relative w-full max-w-5xl h-[80vh]">
                         <Image
                             src={photos[lightboxIndex].url}
                             alt={photos[lightboxIndex].filename}
                             fill
+                            unoptimized
                             className="object-contain"
                             sizes="90vw"
                             priority

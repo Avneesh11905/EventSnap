@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
         const matchCount = data.matches_found || 0;
 
         // Upsert event_attendees with cached results
+        // Upsert event_attendees with cached results
         await prisma.eventAttendee.upsert({
             where: {
                 event_id_attendee_id: {
