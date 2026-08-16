@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
 const MAIN_API_URL = process.env.NEXT_PUBLIC_MODEL_URL || "http://localhost:8000";
-const API_KEY = process.env.EVENTSNAP_API_KEY || "";
 
 // GET /api/upload/status?taskId=xxx — proxy encoding progress from main_api
 export async function GET(req: NextRequest) {
@@ -19,7 +18,6 @@ export async function GET(req: NextRequest) {
         }
 
         const headers: Record<string, string> = {};
-        if (API_KEY) headers["X-API-Key"] = API_KEY;
 
         const res = await fetch(`${MAIN_API_URL}/api/events/encode-status/${taskId}`, { headers });
         if (!res.ok) {

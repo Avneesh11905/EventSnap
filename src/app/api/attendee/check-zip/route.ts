@@ -19,9 +19,7 @@ export async function GET(req: NextRequest) {
         if (!eventId) return NextResponse.json({ err: "Missing eventId" }, { status: 400 });
 
         // Check main_api
-        const response = await fetch(`${process.env.NEXT_PUBLIC_MODEL_URL}/api/attendees/check-zip/${eventId}/${userId}`, {
-            headers: { "X-API-Key": process.env.EVENTSNAP_API_KEY || "" }
-        });
+        const response = await fetch(`${process.env.NEXT_PUBLIC_MODEL_URL}/api/attendees/check-zip/${eventId}/${userId}`);
 
         const data = await response.json();
 

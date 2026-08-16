@@ -182,7 +182,7 @@ export default function EventDetailsPage() {
         return (
             <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-5 bg-[var(--background)]">
                 <div className="max-w-sm w-full rounded-xl bg-[var(--card-hover)] border border-[var(--border)] p-8 text-center">
-                    <p className="text-red-400 mb-6">{error}</p>
+                    <p className="text-red-400 mb-6">{typeof error === 'string' ? error : JSON.stringify(error)}</p>
                     <Link href="/organizer/dashboard" className="btn-primary inline-flex">Go Back</Link>
                 </div>
             </div>
@@ -206,8 +206,8 @@ export default function EventDetailsPage() {
 
                 {error && (
                     <div className="bg-red-950 border border-red-900 rounded-md px-4 py-3 mb-4 text-red-400 text-sm flex items-center justify-between">
-                        {error}
-                        <button onClick={() => setError("")} className="hover:text-red-300 transition"><X size={14} /></button>
+                        <span className="truncate mr-2">{typeof error === 'string' ? error : JSON.stringify(error)}</span>
+                        <button onClick={() => setError("")} className="hover:text-red-300 transition shrink-0"><X size={14} /></button>
                     </div>
                 )}
 

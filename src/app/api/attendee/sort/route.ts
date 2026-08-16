@@ -7,7 +7,6 @@ import { ensureBucketExists } from "@/lib/s3";
 export const dynamic = "force-dynamic";
 
 const MAIN_API_URL = process.env.NEXT_PUBLIC_MODEL_URL || "http://localhost:8000";
-const API_KEY = process.env.EVENTSNAP_API_KEY || "";
 
 const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT || "";
 const MINIO_BUCKET = process.env.MINIO_BUCKET_NAME || "";
@@ -68,13 +67,12 @@ export async function POST(req: NextRequest) {
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
         };
-        if (API_KEY) headers["X-API-Key"] = API_KEY;
 
         const sortRes = await fetch(`${MAIN_API_URL}/api/attendees/sort-attendee/`, {
             method: "POST",
             headers,
             body: JSON.stringify({
-                minio_folder_path: eventCode.toUpperCase(),
+                event_code: eventCode.toUpperCase(),
                 attendee_encodings: user.face_encoding,
             }),
         });

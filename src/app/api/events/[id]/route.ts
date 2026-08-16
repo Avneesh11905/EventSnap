@@ -239,14 +239,14 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
         // ─── MinIO Cleanup: Photos ───
         try {
-            await deleteS3Folder(`${event.code}/`);
+            await deleteS3Folder(`event/${event.code}/`);
         } catch (s3Err) {
             console.error("Failed to cleanup Photos folder:", s3Err);
         }
 
         // ─── MinIO Cleanup: ZIPs ───
         try {
-            await deleteS3Folder(`zips/${id}/`);
+            await deleteS3Folder(`zip/${id}/`);
         } catch (s3Err) {
             console.error("Failed to cleanup ZIPs folder:", s3Err);
         }
@@ -256,10 +256,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
             const modelUrl = process.env.NEXT_PUBLIC_MODEL_URL || 'http://localhost:8000';
             // Use standardized prefix /api/events/
             await fetch(`${modelUrl}/api/events/delete-event-table/${event.code}`, {
-                method: "DELETE",
-                headers: {
-                    "X-API-Key": process.env.EVENTSNAP_API_KEY || ''
-                }
+                method: "DELETE"
             });
         } catch (mlErr) {
             console.error("Failed to cleanup ML database table:", mlErr);

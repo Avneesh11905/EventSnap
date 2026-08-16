@@ -94,7 +94,7 @@ export async function DELETE(
 
         // ─── MinIO Cleanup: Personal ZIP ───
         try {
-            const zipKey = `zips/${eventId}/${userId}.zip`;
+            const zipKey = `zip/${eventId}/${userId}.zip`;
             await s3.send(new DeleteObjectCommand({
                 Bucket: BUCKET,
                 Key: zipKey,

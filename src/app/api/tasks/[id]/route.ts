@@ -20,9 +20,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
         }
 
         // Proxy to main_api for status
-        const res = await fetch(`${process.env.NEXT_PUBLIC_MODEL_URL}/api/tasks/${taskId}`, {
-            headers: { "X-API-Key": process.env.EVENTSNAP_API_KEY || "" }
-        });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_MODEL_URL}/api/tasks/${taskId}`);
 
         const data = await res.json();
 

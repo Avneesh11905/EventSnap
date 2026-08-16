@@ -7,7 +7,6 @@ import { Prisma } from "@prisma/client";
 export const dynamic = "force-dynamic";
 
 const MAIN_API_URL = process.env.NEXT_PUBLIC_MODEL_URL || "http://localhost:8000";
-const API_KEY = process.env.EVENTSNAP_API_KEY || "";
 
 // POST /api/attendee/encode — Send 3 face images to backend, store encodings
 export async function POST(req: NextRequest) {
@@ -36,9 +35,6 @@ export async function POST(req: NextRequest) {
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
         };
-        if (API_KEY) {
-            headers["X-API-Key"] = API_KEY;
-        }
 
         const encodeRes = await fetch(`${MAIN_API_URL}/api/attendees/encode-attendee/`, {
             method: "POST",

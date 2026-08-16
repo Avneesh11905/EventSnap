@@ -40,7 +40,7 @@ export async function POST(
         }
 
         // 2. Scan MinIO for ground truth
-        const prefix = `${event.code}/`;
+        const prefix = `event/${event.code}/`;
         let totalCount = 0;
         let totalSizeBytes = 0;
         let isTruncated = true;

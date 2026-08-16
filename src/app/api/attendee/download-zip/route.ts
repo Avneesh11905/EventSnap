@@ -42,8 +42,7 @@ export async function POST(req: NextRequest) {
         const response = await fetch(`${process.env.NEXT_PUBLIC_MODEL_URL}/api/attendees/generate-zip/`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
-                "X-API-Key": process.env.EVENTSNAP_API_KEY || ""
+                "Content-Type": "application/json"
             },
             body: JSON.stringify({
                 event_id: eventId,

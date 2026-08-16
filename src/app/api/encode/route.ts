@@ -38,15 +38,13 @@ export async function POST(req: NextRequest) {
 
         // Proxy the call to the main_api server-side (no CORS issues)
         const MAIN_API_URL = process.env.NEXT_PUBLIC_MODEL_URL || "http://localhost:8000";
-        const API_KEY = process.env.EVENTSNAP_API_KEY || "";
 
         const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (API_KEY) headers["X-API-Key"] = API_KEY;
 
         const encodeRes = await fetch(`${MAIN_API_URL}/api/events/encode-event/`, {
             method: "POST",
             headers,
-            body: JSON.stringify({ minio_folder_path: event.code }),
+            body: JSON.stringify({ event_code: event.code }),
         });
 
         const encodeData = await encodeRes.json();
