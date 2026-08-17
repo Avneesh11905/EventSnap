@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { signIn } from "next-auth/react";
-import { Loader2, Github, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Loader2, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
 export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
@@ -10,6 +10,7 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [role, setRole] = useState("attendee");
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
@@ -23,6 +24,7 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
             const res = await signIn("credentials", {
                 email,
                 password,
+                role: !isLogin ? role : undefined,
                 redirect: false,
             });
 
@@ -31,8 +33,11 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
             } else {
                 if (onSuccess) onSuccess();
                 
-                // Redirect based on role logic
-                if (email.toLowerCase() === "admin@gmail.com") {
+                // Redirect based on role from session
+                const sessionRes = await fetch("/api/auth/session");
+                const sessionData = await sessionRes.json();
+                
+                if (sessionData?.user?.role === "organizer") {
                     window.location.href = "/organizer/dashboard";
                 } else {
                     window.location.href = "/attendee/dashboard";
@@ -70,7 +75,7 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
             )}
 
             {/* OAuth Buttons */}
-            <div className="grid grid-cols-2 gap-3 w-full mb-6">
+            <div className="grid grid-cols-1 gap-3 w-full mb-6">
                 <button
                     onClick={() => signIn("google", { callbackUrl: "/attendee/dashboard" })}
                     type="button"
@@ -82,16 +87,7 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
                         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                     </svg>
-                    Google
-                </button>
-
-                <button
-                    onClick={() => signIn("github", { callbackUrl: "/attendee/dashboard" })}
-                    type="button"
-                    className="w-full h-10 flex items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--card-hover)] text-[var(--foreground)] font-medium transition-colors text-[13px] shadow-sm"
-                >
-                    <Github className="w-4 h-4" />
-                    GitHub
+                    Continue with Google
                 </button>
             </div>
 
@@ -103,18 +99,34 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
 
             <form onSubmit={handleCredentialsSubmit} className="space-y-3.5 w-full">
                 {!isLogin && (
-                    <div className="space-y-1.5">
-                        <label className="text-[13px] font-medium text-[var(--foreground)]">Full Name</label>
-                        <div className="relative flex items-center">
-                            <User className="absolute left-3 w-4 h-4 text-[var(--foreground-secondary)]" />
-                            <input
-                                type="text"
-                                required
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="John Doe"
-                                className="w-full h-11 pl-10 pr-4 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[14px] text-[var(--foreground)] placeholder:text-[var(--foreground-secondary)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] outline-none transition-all shadow-sm"
-                            />
+                    <div className="space-y-3.5">
+                        <div className="space-y-1.5">
+                            <label className="text-[13px] font-medium text-[var(--foreground)]">I am an</label>
+                            <div className="flex items-center gap-3">
+                                <label className="flex-1 flex items-center gap-2 p-3 rounded-lg border border-[var(--border)] bg-[var(--background)] cursor-pointer hover:border-[var(--primary)] transition-colors">
+                                    <input type="radio" name="role" value="attendee" checked={role === "attendee"} onChange={(e) => setRole(e.target.value)} className="w-4 h-4 text-[var(--primary)] accent-[var(--primary)]" />
+                                    <span className="text-[14px] text-[var(--foreground)]">Attendee</span>
+                                </label>
+                                <label className="flex-1 flex items-center gap-2 p-3 rounded-lg border border-[var(--border)] bg-[var(--background)] cursor-pointer hover:border-[var(--primary)] transition-colors">
+                                    <input type="radio" name="role" value="organizer" checked={role === "organizer"} onChange={(e) => setRole(e.target.value)} className="w-4 h-4 text-[var(--primary)] accent-[var(--primary)]" />
+                                    <span className="text-[14px] text-[var(--foreground)]">Organizer</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[13px] font-medium text-[var(--foreground)]">Full Name</label>
+                            <div className="relative flex items-center">
+                                <User className="absolute left-3 w-4 h-4 text-[var(--foreground-secondary)]" />
+                                <input
+                                    type="text"
+                                    required
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="John Doe"
+                                    className="w-full h-11 pl-10 pr-4 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[14px] text-[var(--foreground)] placeholder:text-[var(--foreground-secondary)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] outline-none transition-all shadow-sm"
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -201,3 +213,4 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
         </div>
     );
 }
+

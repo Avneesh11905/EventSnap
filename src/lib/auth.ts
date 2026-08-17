@@ -1,6 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -11,7 +10,8 @@ export const authOptions: NextAuthOptions = {
             name: "Credentials",
             credentials: {
                 email: { label: "Email", type: "email" },
-                password: { label: "Password", type: "password" }
+                password: { label: "Password", type: "password" },
+                role: { label: "Role", type: "text" }
             },
             async authorize(credentials) {
                 if (!credentials?.email || !credentials?.password) {
@@ -21,27 +21,7 @@ export const authOptions: NextAuthOptions = {
                 const email = credentials.email.toLowerCase();
                 const password = credentials.password;
 
-                // 1. Organizer logic
-                if (email === "admin@gmail.com" && password === "admin123") {
-                    // Check if admin exists in DB, if not, create it
-                    let admin = await prisma.user.findUnique({ where: { email } });
-                    if (!admin) {
-                        const hashedPassword = await bcrypt.hash(password, 10);
-                        admin = await prisma.user.create({
-                            data: {
-                                full_name: "Admin Organizer",
-                                username: "admin_organizer",
-                                email,
-                                provider: "credentials",
-                                role: "organizer",
-                                password: hashedPassword,
-                            }
-                        });
-                    }
-                    return { id: admin.id, email: admin.email, name: admin.full_name, role: admin.role };
-                }
-
-                // 2. Attendee logic
+                // 2. User logic
                 let user = await prisma.user.findUnique({ where: { email } });
 
                 if (!user) {
@@ -55,14 +35,14 @@ export const authOptions: NextAuthOptions = {
                             username,
                             email,
                             provider: "credentials",
-                            role: "attendee",
+                            role: credentials.role === "organizer" ? "organizer" : "attendee",
                             password: hashedPassword,
                         }
                     });
                 } else {
                     // Sign in - check password
                     if (!user.password) {
-                        throw new Error("Please log in with Google or GitHub");
+                        throw new Error("Please log in with Google");
                     }
                     const isValid = await bcrypt.compare(password, user.password);
                     if (!isValid) {
@@ -76,10 +56,6 @@ export const authOptions: NextAuthOptions = {
         GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID ?? "",
             clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-        }),
-        GitHubProvider({
-            clientId: process.env.GITHUB_CLIENT_ID ?? "",
-            clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
         }),
     ],
 
@@ -122,6 +98,7 @@ export const authOptions: NextAuthOptions = {
                         email,
                         provider: account.provider,
                         image: user.image || "",
+                        role: "attendee",
                     },
                 });
 

@@ -48,7 +48,7 @@ export async function GET() {
                 name: ea.attendee.full_name || "Attendee",
                 email: ea.attendee.email || "No email",
                 downloaded: ea.downloaded,
-                downloadedAt: ea.downloaded_at,
+                downloaded_at: ea.downloaded_at,
             }));
 
             // Remove attendees relation from root object to match original payload

@@ -91,6 +91,16 @@ export default function Navbar() {
                                     </Link>
                                 </>
                             )}
+                            {!isOrganizer && (
+                                <Link
+                                    href="/attendee/dashboard"
+                                    className="px-3 py-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer flex items-center gap-2 text-[13px] font-medium"
+                                    title="Dashboard"
+                                >
+                                    <LayoutDashboard size={14} />
+                                    <span>Dashboard</span>
+                                </Link>
+                            )}
 
                             <div className="hidden sm:block w-[1px] h-4 bg-[var(--border)] mx-2"></div>
 
@@ -153,14 +163,16 @@ export default function Navbar() {
                                 {link.label}
                             </Link>
                         ))}
-                        {session && isOrganizer && (
+                        {session && (
                             <div className="pt-2 pb-2">
-                                <Link
-                                    href="/organizer/dashboard"
-                                    className="block px-4 py-2.5 rounded-md text-[14px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer"
-                                >
-                                    Organizer Dashboard
-                                </Link>
+                                {isOrganizer && (
+                                    <Link
+                                        href="/organizer/dashboard"
+                                        className="block px-4 py-2.5 rounded-md text-[14px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer"
+                                    >
+                                        Organizer Dashboard
+                                    </Link>
+                                )}
                                 <Link
                                     href="/attendee/dashboard"
                                     className="block px-4 py-2.5 rounded-md text-[14px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer"
