@@ -3,7 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { s3, BUCKET } from "@/lib/s3";
-import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,45 @@ export async function GET(
             return NextResponse.json({ err: "No access record found for this event" }, { status: 404 });
         }
 
+        let rawPhotos = access.matched_photos;
+        if (typeof rawPhotos === 'string') {
+            try { rawPhotos = JSON.parse(rawPhotos); } catch(e) { rawPhotos = []; }
+        }
+        if (!Array.isArray(rawPhotos)) rawPhotos = [];
+        
+        // Generate pre-signed URLs since bucket is private
+        const signedPhotos = await Promise.all(
+            rawPhotos.map(async (photo: any) => {
+                try {
+                    let key = photo.path;
+                    if (!key && photo.url) {
+                        try {
+                            const urlObj = new URL(photo.url);
+                            key = decodeURIComponent(urlObj.pathname).replace(`/${BUCKET}/`, '');
+                        } catch (e) {}
+                    }
+                    if (!key) return photo;
+
+                    // Optimization: The Python backend returns paths to the 20MB raw images. 
+                    // We must swap this to the compressed thumbnails so the grid loads instantly!
+                    const thumbKey = key.replace("/raw/", "/thumbs/");
+
+                    const command = new GetObjectCommand({
+                        Bucket: BUCKET,
+                        Key: thumbKey,
+                    });
+                    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+                    
+                    // We can also generate a high-res url for the lightbox if we want, 
+                    // but serving the thumb URL as the primary image URL fixes the loading issue.
+                    return { ...photo, url: signedUrl, thumb_url: signedUrl };
+                } catch (e) {
+                    console.error("Failed to sign URL for photo:", e);
+                    return photo; 
+                }
+            })
+        );
+
         return NextResponse.json({
             success: true,
             event: {
@@ -63,7 +103,7 @@ export async function GET(
                 photoCount: event.photo_count,
             },
             matchCount: access.match_count || 0,
-            photos: access.matched_photos || [],
+            photos: signedPhotos,
             accessedAt: access.accessed_at,
             downloaded: access.downloaded,
         });
