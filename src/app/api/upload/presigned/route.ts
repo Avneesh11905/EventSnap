@@ -43,12 +43,24 @@ export async function POST(req: NextRequest) {
 
         // Generate pre-signed URLs
         const folderName = `event/${event.code}`;
+        
+        // Ensure consistent UUIDs across raw and thumbs for the same file
+        const uuidMap = new Map<string, string>();
+
         const urls = await Promise.all(
             files.map(async (file: { name: string; type: string; folder?: string }) => {
                 // Strip any nested directory paths from the filename (e.g., "folder/image.jpg" -> "image.jpg")
                 const basename = file.name.split("/").pop() || file.name;
                 const folderPath = file.folder ? `${folderName}/${file.folder}` : folderName;
-                const key = `${folderPath}/${basename}`;
+                
+                // Get or generate UUID for this filename
+                if (!uuidMap.has(basename)) {
+                    uuidMap.set(basename, crypto.randomUUID());
+                }
+                const fileUuid = uuidMap.get(basename);
+
+                // Prepend UUID to prevent overwrites
+                const key = `${folderPath}/${fileUuid}-${basename}`;
                 const command = new PutObjectCommand({
                     Bucket: BUCKET,
                     Key: key,

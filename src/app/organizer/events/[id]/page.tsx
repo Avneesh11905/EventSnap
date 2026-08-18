@@ -228,7 +228,7 @@ export default function EventDetailsPage() {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             {[
                                 { label: "Photos", value: photoCount.toLocaleString() },
-                                { label: "Encoded", value: encodedCount !== null ? encodedCount.toLocaleString() : "..." },
+                                { label: "Encoded", value: typeof encodedCount === 'number' ? encodedCount.toLocaleString() : "..." },
                                 { label: "Attendees", value: event?.attendeesAccessed?.length || 0 },
                                 { label: "Storage", value: `${(event?.total_size_mb || 0).toFixed(1)} MB` }
                             ].map((stat, i) => (
@@ -385,7 +385,7 @@ export default function EventDetailsPage() {
                                         {uploadingEventId === event?.id && phase === "uploading" ? "Upload in progress..." : "Upload photos first"}
                                     </p>
                                 </div>
-                            ) : encodedCount !== null && encodedCount >= (event?.photo_count || 0) && (event?.photo_count || 0) > 0 ? (
+                            ) : typeof encodedCount === 'number' && encodedCount >= (event?.photo_count || 0) && (event?.photo_count || 0) > 0 ? (
                                 <div className="text-center space-y-2">
                                     <div className="w-10 h-10 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto">
                                         <CheckCircle size={18} className="text-emerald-500" />
@@ -400,7 +400,7 @@ export default function EventDetailsPage() {
                                     <div className="w-10 h-10 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto relative">
                                         <Cpu size={18} className="text-[var(--foreground-secondary)]" />
                                     </div>
-                                    {encodedCount !== null && encodedCount > 0 && (
+                                    {typeof encodedCount === 'number' && encodedCount > 0 && (
                                         <p className="text-[11px] text-[var(--foreground-secondary)]">{encodedCount}/{event?.photo_count || 0} encoded</p>
                                     )}
                                     <button

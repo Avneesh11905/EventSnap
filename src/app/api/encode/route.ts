@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Proxy the call to the main_api server-side (no CORS issues)
-        const MAIN_API_URL = process.env.NEXT_PUBLIC_MODEL_URL || "http://localhost:8000";
+        const MAIN_API_URL = process.env.NEXT_PUBLIC_INFERENCE_API_URL || "http://localhost:8000";
 
         const headers: Record<string, string> = { "Content-Type": "application/json" };
 

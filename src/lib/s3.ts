@@ -2,8 +2,6 @@ import {
     S3Client,
     HeadBucketCommand,
     CreateBucketCommand,
-    PutBucketCorsCommand,
-    PutBucketPolicyCommand,
 } from "@aws-sdk/client-s3";
 
 const endpoint = process.env.STORAGE_ENDPOINT!;
@@ -43,48 +41,8 @@ export async function ensureBucketExists() {
         }
     }
 
-    // Always ensure CORS is configured (MinIO persistent storage might need it)
-    try {
-        await s3.send(new PutBucketCorsCommand({
-            Bucket: BUCKET,
-            CORSConfiguration: {
-                CORSRules: [
-                    {
-                        AllowedHeaders: ["*"],
-                        AllowedMethods: ["PUT", "GET", "POST", "HEAD"],
-                        AllowedOrigins: ["*"], // In production, restrict to your domain
-                        ExposeHeaders: ["ETag"],
-                        MaxAgeSeconds: 3000,
-                    },
-                ],
-            },
-        }));
-        bucketChecked = true;
-    } catch (corsErr) {
-        console.error("Failed to configure CORS for bucket:", corsErr);
-    }
-
-    // New: Ensure Public-Read Policy so images can be displayed in the browser
-    try {
-        const publicReadPolicy = {
-            Version: "2012-10-17",
-            Statement: [
-                {
-                    Sid: "PublicRead",
-                    Effect: "Allow",
-                    Principal: "*",
-                    Action: ["s3:GetObject"],
-                    Resource: [`arn:aws:s3:::${BUCKET}/*`],
-                },
-            ],
-        };
-
-        await s3.send(new PutBucketPolicyCommand({
-            Bucket: BUCKET,
-            Policy: JSON.stringify(publicReadPolicy),
-        }));
-        console.log(`Public-read policy applied to bucket "${BUCKET}".`);
-    } catch (policyErr) {
-        console.error("Failed to apply public-read policy to bucket:", policyErr);
-    }
+    // CORS is omitted here because Google Cloud Storage (GCS) S3 interoperability 
+    // does not fully support PutBucketCorsCommand from the AWS SDK.
+    // Ensure you have set CORS on your GCS bucket using the Google Cloud Console or gsutil.
+    bucketChecked = true;
 }

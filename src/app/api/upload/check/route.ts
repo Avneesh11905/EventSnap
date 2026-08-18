@@ -13,10 +13,10 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { eventId, filenames } = body;
+        const { eventId, files } = body;
 
-        if (!eventId || !filenames || !Array.isArray(filenames)) {
-            return NextResponse.json({ err: "Missing eventId or valid filenames array" }, { status: 400 });
+        if (!eventId || !files || !Array.isArray(files)) {
+            return NextResponse.json({ err: "Missing eventId or valid files array" }, { status: 400 });
         }
 
         // Verify event ownership
@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
 
         // Query MinIO for objects under this event's raw/ folder
         const prefix = `event/${event.code.endsWith('/') ? event.code : event.code + '/'}raw/`;
-        const existingFiles = new Set<string>();
+        // Store existing files as a Map of: originalBasename -> Set of sizes
+        const existingFiles = new Map<string, Set<number>>();
         let totalMinioSizeMB = 0;
 
         try {
@@ -61,10 +62,17 @@ export async function POST(req: NextRequest) {
                 if (response.Contents) {
                     for (const item of response.Contents) {
                         if (item.Key) {
-                            // Extract basename: "eventcode/my_image.jpg" -> "my_image.jpg"
+                            // Extract basename: "eventcode/raw/my_image.jpg" -> "my_image.jpg"
                             const basename = item.Key.substring(prefix.length);
                             if (basename.length > 0) {
-                                existingFiles.add(basename);
+                                // Strip the UUID prefix if it exists so Smart Resume can match the original filename
+                                const originalBasename = basename.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, '');
+                                
+                                if (!existingFiles.has(originalBasename)) {
+                                    existingFiles.set(originalBasename, new Set());
+                                }
+                                existingFiles.get(originalBasename)!.add(item.Size || 0);
+                                
                                 if (item.Size) {
                                     totalMinioSizeMB += item.Size / (1024 * 1024);
                                 }
@@ -83,6 +91,14 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Calculate true total count based on unique (basename + size) combinations
+        // This ensures that if any exact duplicates (same name and size) were uploaded, 
+        // they are only counted once in the database photo_count.
+        let trueTotalCount = 0;
+        for (const sizes of existingFiles.values()) {
+            trueTotalCount += sizes.size;
+        }
+
         // --- SELF-HEAL DATABASE ---
         // We now have the exact ground truth of MinIO, so let's overwrite the DB to ensure perfect sync
         // in case previous uploads were interrupted.
@@ -90,7 +106,7 @@ export async function POST(req: NextRequest) {
             await prisma.event.update({
                 where: { id: eventId },
                 data: {
-                    photo_count: existingFiles.size,
+                    photo_count: trueTotalCount,
                     total_size_mb: Number(totalMinioSizeMB.toFixed(2))
                 },
             });
@@ -98,16 +114,17 @@ export async function POST(req: NextRequest) {
             console.error("Failed to self-heal database:", dbErr);
         }
 
-        // Check which requested filenames already exist
-        const alreadyUploaded = filenames.filter(name => {
-            const basename = name.split("/").pop() || name;
-            return existingFiles.has(basename);
-        });
+        // Check which requested files already exist based on name AND size
+        const alreadyUploaded = files.filter((f: any) => {
+            const basename = f.name.split("/").pop() || f.name;
+            const existingSizes = existingFiles.get(basename);
+            return existingSizes && existingSizes.has(f.size);
+        }).map((f: any) => f.name);
 
         return NextResponse.json({
             success: true,
             existingFiles: alreadyUploaded,
-            trueTotalCount: existingFiles.size
+            trueTotalCount
         });
 
     } catch (error) {

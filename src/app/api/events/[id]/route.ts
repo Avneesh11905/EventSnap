@@ -253,7 +253,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
         // ─── ML Backend Table Cleanup ───
         try {
-            const modelUrl = process.env.NEXT_PUBLIC_MODEL_URL || 'http://localhost:8000';
+            const modelUrl = process.env.NEXT_PUBLIC_INFERENCE_API_URL || 'http://localhost:8000';
             // Use standardized prefix /api/events/
             await fetch(`${modelUrl}/api/events/delete-event-table/${event.code}`, {
                 method: "DELETE"
