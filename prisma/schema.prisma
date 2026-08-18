@@ -54,7 +54,7 @@ model EventAttendee {
   downloaded     Boolean         @default(false)
   downloaded_at  DateTime?
   
-  matched_photos Json?
+  matched_photos MatchedPhoto[]
   match_count    Int             @default(0)
 
   event          Event           @relation(fields: [event_id], references: [id], onDelete: Cascade)
@@ -62,4 +62,16 @@ model EventAttendee {
 
   @@unique([event_id, attendee_id])
   @@map("event_attendees")
+}
+
+model MatchedPhoto {
+  id                String        @id @default(uuid())
+  event_attendee_id String
+  file_key          String
+  created_at        DateTime      @default(now())
+
+  event_attendee    EventAttendee @relation(fields: [event_attendee_id], references: [id], onDelete: Cascade)
+
+  @@index([event_attendee_id])
+  @@map("matched_photos")
 }

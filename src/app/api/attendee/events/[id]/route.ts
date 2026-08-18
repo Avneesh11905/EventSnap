@@ -53,23 +53,13 @@ export async function GET(
             return NextResponse.json({ err: "No access record found for this event" }, { status: 404 });
         }
 
-        let rawPhotos = access.matched_photos;
-        if (typeof rawPhotos === 'string') {
-            try { rawPhotos = JSON.parse(rawPhotos); } catch(e) { rawPhotos = []; }
-        }
-        if (!Array.isArray(rawPhotos)) rawPhotos = [];
+        let rawPhotos = access.matched_photos || [];
         
         // Generate pre-signed URLs since bucket is private
         const signedPhotos = await Promise.all(
             rawPhotos.map(async (photo: any) => {
                 try {
-                    let key = photo.path;
-                    if (!key && photo.url) {
-                        try {
-                            const urlObj = new URL(photo.url);
-                            key = decodeURIComponent(urlObj.pathname).replace(`/${BUCKET}/`, '');
-                        } catch (e) {}
-                    }
+                    let key = photo.file_key || photo.path; // fallback for backwards compatibility
                     if (!key) return photo;
 
                     // Optimization: The Python backend returns paths to the 20MB raw images. 
@@ -84,7 +74,8 @@ export async function GET(
                     
                     // We can also generate a high-res url for the lightbox if we want, 
                     // but serving the thumb URL as the primary image URL fixes the loading issue.
-                    return { ...photo, url: signedUrl, thumb_url: signedUrl };
+                    const filename = key.split("/").pop() || key;
+                    return { ...photo, filename, url: signedUrl, thumb_url: signedUrl };
                 } catch (e) {
                     console.error("Failed to sign URL for photo:", e);
                     return photo; 

@@ -29,14 +29,14 @@ export async function POST(req: NextRequest) {
                     attendee_id: userId
                 }
             },
-            select: { matched_photos: true }
+            include: { matched_photos: true }
         });
 
-        if (!access || !access.matched_photos || (access.matched_photos as unknown as any[]).length === 0) {
+        if (!access || !access.matched_photos || access.matched_photos.length === 0) {
             return NextResponse.json({ err: "No photos found" }, { status: 404 });
         }
 
-        const photos = access.matched_photos as unknown as { filename: string; path: string }[];
+        const photos = access.matched_photos;
 
         // Call main_api to start background zipping
         const response = await fetch(`${process.env.NEXT_PUBLIC_INFERENCE_API_URL}/api/attendees/generate-zip/`, {
@@ -47,7 +47,10 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify({
                 event_id: eventId,
                 user_id: userId,
-                image_paths: photos.map(p => ({ filename: p.filename, path: p.path }))
+                image_paths: photos.map(p => ({ 
+                    filename: p.file_key.split('/').pop() || p.file_key, 
+                    path: p.file_key 
+                }))
             })
         });
 
