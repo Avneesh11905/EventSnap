@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 
 const MAIN_API_URL = process.env.NEXT_PUBLIC_MODEL_URL || "http://localhost:8000";
 
-const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT || "";
-const MINIO_BUCKET = process.env.MINIO_BUCKET_NAME || "";
+const STORAGE_ENDPOINT = process.env.STORAGE_ENDPOINT || "";
+const STORAGE_BUCKET = process.env.STORAGE_BUCKET_NAME || "";
 
 // POST /api/attendee/sort — Sort photos, cache results in event_attendees
 export async function POST(req: NextRequest) {
@@ -87,9 +87,9 @@ export async function POST(req: NextRequest) {
 
         const data = await sortRes.json();
 
-        // Transform MinIO paths to full URLs
+        // Transform STORAGE paths to full URLs
         const photos = (data.photos || []).map((path: string) => ({
-            url: `${MINIO_ENDPOINT}/${MINIO_BUCKET}/${path}`,
+            url: `${STORAGE_ENDPOINT}/${STORAGE_BUCKET}/${path}`,
             filename: path.split("/").pop() || path,
             path,
         }));

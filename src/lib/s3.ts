@@ -6,11 +6,11 @@ import {
     PutBucketPolicyCommand,
 } from "@aws-sdk/client-s3";
 
-const endpoint = process.env.MINIO_ENDPOINT!;
-const accessKey = process.env.MINIO_ACCESS_KEY!;
-const secretKey = process.env.MINIO_SECRET_KEY!;
+const endpoint = process.env.STORAGE_ENDPOINT!;
+const accessKey = process.env.STORAGE_ACCESS_KEY!;
+const secretKey = process.env.STORAGE_SECRET_KEY!;
 
-export const BUCKET = process.env.MINIO_BUCKET_NAME!;
+export const BUCKET = process.env.STORAGE_BUCKET_NAME!;
 
 export const s3 = new S3Client({
     endpoint,
