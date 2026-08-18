@@ -40,11 +40,15 @@ export async function POST(
         }
 
         // 2. Scan MinIO for ground truth
-        const prefix = `event/${event.code}/`;
-        let totalCount = 0;
+        const prefix = `event/${event.code.endsWith('/') ? event.code : event.code + '/'}`;
+        const rawPrefix = `${prefix}raw/`;
+        
         let totalSizeBytes = 0;
         let isTruncated = true;
         let continuationToken: string | undefined = undefined;
+
+        // Track unique photos based on basename + size
+        const uniqueRawFiles = new Map<string, Set<number>>();
 
         while (isTruncated) {
             const listRes: any = await s3.send(new ListObjectsV2Command({
@@ -54,18 +58,34 @@ export async function POST(
             }));
 
             if (listRes.Contents) {
-                const validPhotos = listRes.Contents.filter((obj: any) =>
-                    obj.Key &&
-                    !obj.Key.includes("/.system/") &&
-                    obj.Key !== prefix
-                );
+                for (const obj of listRes.Contents) {
+                    if (!obj.Key || obj.Key.includes("/.system/") || obj.Key === prefix) continue;
 
-                totalCount += validPhotos.length;
-                totalSizeBytes += validPhotos.reduce((acc: number, obj: any) => acc + (obj.Size || 0), 0);
+                    // All files contribute to total storage size
+                    totalSizeBytes += (obj.Size || 0);
+
+                    // Only count raw files for photo_count
+                    if (obj.Key.startsWith(rawPrefix) && obj.Key !== rawPrefix) {
+                        const basename = obj.Key.substring(rawPrefix.length);
+                        // Strip UUID if it exists to get the original filename
+                        const originalBasename = basename.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, '');
+                        
+                        if (!uniqueRawFiles.has(originalBasename)) {
+                            uniqueRawFiles.set(originalBasename, new Set());
+                        }
+                        uniqueRawFiles.get(originalBasename)!.add(obj.Size || 0);
+                    }
+                }
             }
 
             isTruncated = listRes.IsTruncated || false;
             continuationToken = listRes.NextContinuationToken;
+        }
+
+        // Calculate true total count based on unique (basename + size) combinations
+        let totalCount = 0;
+        for (const sizes of uniqueRawFiles.values()) {
+            totalCount += sizes.size;
         }
 
         const totalSizeMB = totalSizeBytes / (1024 * 1024);

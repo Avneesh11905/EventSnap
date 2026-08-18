@@ -298,7 +298,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     eventId: event.id,
-                    filenames: files.map(f => f.name)
+                    files: files.map(f => ({ name: f.name, size: f.size }))
                 }),
                 signal: abortController.signal,
             });
@@ -311,10 +311,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
             if (checkData.success && checkData.existingFiles?.length > 0) {
                 const existingSet = new Set(checkData.existingFiles);
-                filesToUpload = files.filter(f => {
-                    const basename = f.name.split("/").pop() || f.name;
-                    return !existingSet.has(basename);
-                });
+                filesToUpload = files.filter(f => !existingSet.has(f.name));
                 skippedCount = files.length - filesToUpload.length;
                 successCount = skippedCount; // Assume already uploaded ones are successes 
 
