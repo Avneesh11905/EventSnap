@@ -8,69 +8,71 @@ datasource db {
 }
 
 model User {
-  id             String          @id @default(uuid())
-  full_name      String
-  username       String          @unique
-  email          String          @unique
-  password       String?
-  image          String?
-  provider       String
-  role           String          @default("attendee") // "attendee" | "organizer"
-  face_encoding  Json?           // Storing the number[][] as JSON
-  has_encoding   Boolean         @default(false)
-  created_at     DateTime        @default(now())
+  id            String   @id @default(uuid())
+  full_name     String
+  username      String   @unique
+  email         String   @unique
+  password      String?
+  image         String?
+  provider      String
+  role          String   @default("attendee") // "attendee" | "organizer"
+  face_encoding Json? // Storing the number[][] as JSON
+  has_encoding  Boolean  @default(false)
+  created_at    DateTime @default(now())
 
-  events         Event[]         @relation("EventOwner")
-  attendances    EventAttendee[]
-  
+  events      Event[]         @relation("EventOwner")
+  attendances EventAttendee[]
+
   @@map("users")
 }
 
 model Event {
-  id             String          @id @default(uuid())
+  id             String    @id @default(uuid())
   name           String
-  code           String          @unique
+  code           String    @unique
   description    String?
   date           DateTime?
-  status         String          @default("active") // "draft" | "active" | "archived"
-  photo_count    Int             @default(0)
-  total_size_mb  Float           @default(0)
-  download_count Int             @default(0)
-  created_at     DateTime        @default(now())
+  status         String    @default("active") // "draft" | "active" | "archived"
+  photo_count    Int       @default(0)
+  total_size_mb  Float     @default(0)
+  download_count Int       @default(0)
+  created_at     DateTime  @default(now())
 
-  owner_id       String
-  owner          User            @relation("EventOwner", fields: [owner_id], references: [id], onDelete: Cascade)
-  
-  attendees      EventAttendee[]
-  
+  owner_id String
+  owner    User   @relation("EventOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+
+  attendees EventAttendee[]
+
+  @@index([owner_id])
   @@map("events")
 }
 
 model EventAttendee {
-  id             String          @id @default(uuid())
-  event_id       String
-  attendee_id    String
-  accessed_at    DateTime        @default(now())
-  downloaded     Boolean         @default(false)
-  downloaded_at  DateTime?
-  
-  matched_photos MatchedPhoto[]
-  match_count    Int             @default(0)
+  id            String    @id @default(uuid())
+  event_id      String
+  attendee_id   String
+  accessed_at   DateTime  @default(now())
+  downloaded    Boolean   @default(false)
+  downloaded_at DateTime?
 
-  event          Event           @relation(fields: [event_id], references: [id], onDelete: Cascade)
-  attendee       User            @relation(fields: [attendee_id], references: [id], onDelete: Cascade)
+  matched_photos MatchedPhoto[]
+  match_count    Int            @default(0)
+
+  event    Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  attendee User  @relation(fields: [attendee_id], references: [id], onDelete: Cascade)
 
   @@unique([event_id, attendee_id])
+  @@index([attendee_id])
   @@map("event_attendees")
 }
 
 model MatchedPhoto {
-  id                String        @id @default(uuid())
+  id                String   @id @default(uuid())
   event_attendee_id String
   file_key          String
-  created_at        DateTime      @default(now())
+  created_at        DateTime @default(now())
 
-  event_attendee    EventAttendee @relation(fields: [event_attendee_id], references: [id], onDelete: Cascade)
+  event_attendee EventAttendee @relation(fields: [event_attendee_id], references: [id], onDelete: Cascade)
 
   @@index([event_attendee_id])
   @@map("matched_photos")
