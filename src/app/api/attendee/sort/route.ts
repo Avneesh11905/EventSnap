@@ -6,7 +6,7 @@ import { ensureBucketExists } from "@/lib/s3";
 
 export const dynamic = "force-dynamic";
 
-const MAIN_API_URL = process.env.NEXT_PUBLIC_MODEL_URL || "http://localhost:8000";
+const MAIN_API_URL = process.env.NEXT_PUBLIC_INFERENCE_API_URL || "http://localhost:8000";
 
 const STORAGE_ENDPOINT = process.env.STORAGE_ENDPOINT || "";
 const STORAGE_BUCKET = process.env.STORAGE_BUCKET_NAME || "";
