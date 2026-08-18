@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         const photos = access.matched_photos as unknown as { filename: string; path: string }[];
 
         // Call main_api to start background zipping
-        const response = await fetch(`${process.env.NEXT_PUBLIC_MODEL_URL}/api/attendees/generate-zip/`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_INFERENCE_API_URL}/api/attendees/generate-zip/`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
