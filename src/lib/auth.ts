@@ -134,10 +134,10 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             try {
                 if (session.user) {
-                    (session.user as any).id = token.userId;
-                    (session.user as any).username = token.username;
-                    (session.user as any).role = token.role ?? "attendee";
-                    (session.user as any).hasEncoding = token.hasEncoding ?? false;
+                    session.user.id = token.userId as string;
+                    session.user.username = token.username;
+                    session.user.role = token.role ?? "attendee";
+                    session.user.hasEncoding = token.hasEncoding ?? false;
                 }
             } catch (err) {
                 console.error("[AUTH] Session callback error:", err);

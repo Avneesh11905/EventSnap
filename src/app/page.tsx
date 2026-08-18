@@ -27,7 +27,7 @@ export default function LandingPage() {
         if (e) e.preventDefault();
         
         if (session) {
-            const role = (session.user as any)?.role;
+            const role = session.user?.role;
             if (role === "organizer") {
                 router.push("/organizer/dashboard");
             } else {

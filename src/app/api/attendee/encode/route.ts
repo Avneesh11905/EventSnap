@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ err: "Not authenticated" }, { status: 401 });
         }
 
-        const userId = (session.user as any).id;
+        const userId = session.user.id;
         if (!userId) {
             return NextResponse.json({ err: "User not found" }, { status: 404 });
         }
@@ -88,7 +88,7 @@ export async function DELETE() {
             return NextResponse.json({ err: "Not authenticated" }, { status: 401 });
         }
 
-        const userId = (session.user as any).id;
+        const userId = session.user.id;
         if (!userId) {
             return NextResponse.json({ err: "User not found" }, { status: 404 });
         }

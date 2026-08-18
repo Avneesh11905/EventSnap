@@ -51,7 +51,7 @@ interface EventData {
 export default function DashboardPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
-    const isOrganizer = (session?.user as any)?.role === "organizer";
+    const isOrganizer = session?.user?.role === "organizer";
     const [events, setEvents] = useState<EventData[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);

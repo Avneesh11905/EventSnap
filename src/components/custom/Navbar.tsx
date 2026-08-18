@@ -25,7 +25,7 @@ export default function Navbar() {
     const pathname = usePathname();
     const router = useRouter();
     const { data: session } = useSession();
-    const isOrganizer = (session?.user as any)?.role === "organizer";
+    const isOrganizer = session?.user?.role === "organizer";
     const [mobileOpen, setMobileOpen] = useState(false);
 
     useEffect(() => {

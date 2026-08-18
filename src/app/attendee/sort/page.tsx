@@ -40,8 +40,8 @@ const ANGLE_CONFIG: { key: Angle; label: string; instruction: string; icon: stri
 export default function AttendeeSort() {
   const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const router = useRouter();
-  const hasEncoding = (session?.user as any)?.hasEncoding ?? false;
-  const isOrganizer = (session?.user as any)?.role === "organizer";
+  const hasEncoding = session?.user?.hasEncoding ?? false;
+  const isOrganizer = session?.user?.role === "organizer";
 
   // Flow state
   const [step, setStep] = useState<Step>("encode");

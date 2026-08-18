@@ -13,7 +13,7 @@ export default function AuthPage() {
     // Redirect logged-in users based on role
     React.useEffect(() => {
         if (status === "authenticated") {
-            const role = (session?.user as any)?.role;
+            const role = session?.user?.role;
             if (role === "organizer") {
                 router.replace("/organizer/dashboard");
             } else {

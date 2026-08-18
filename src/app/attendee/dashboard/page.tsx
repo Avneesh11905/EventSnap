@@ -34,8 +34,8 @@ interface AttendedEvent {
 export default function AttendeeDashboard() {
     const { data: session, status: sessionStatus, update: updateSession } = useSession();
     const router = useRouter();
-    const hasEncoding = (session?.user as any)?.hasEncoding ?? false;
-    const isOrganizer = (session?.user as any)?.role === "organizer";
+    const hasEncoding = session?.user?.hasEncoding ?? false;
+    const isOrganizer = session?.user?.role === "organizer";
 
     const [events, setEvents] = useState<AttendedEvent[]>([]);
     const [loading, setLoading] = useState(true);

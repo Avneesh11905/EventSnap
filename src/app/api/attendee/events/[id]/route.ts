@@ -21,7 +21,7 @@ export async function GET(
             return NextResponse.json({ err: "Not authenticated" }, { status: 401 });
         }
 
-        const userId = (session.user as any).id;
+        const userId = session.user.id;
         const { id: eventId } = await context.params;
 
         if (!eventId) {
@@ -116,7 +116,7 @@ export async function DELETE(
             return NextResponse.json({ err: "Not authenticated" }, { status: 401 });
         }
 
-        const userId = (session.user as any).id;
+        const userId = session.user.id;
         const { id: eventId } = await context.params;
 
         if (!eventId) {

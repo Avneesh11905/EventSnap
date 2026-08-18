@@ -13,7 +13,7 @@ export async function GET() {
             return NextResponse.json({ err: "Not authenticated" }, { status: 401 });
         }
 
-        const userId = (session.user as any).id;
+        const userId = session.user.id;
         if (!userId) {
             return NextResponse.json({ err: "User not found" }, { status: 404 });
         }

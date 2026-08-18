@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
         const session = await getServerSession(authOptions);
         if (!session?.user) return NextResponse.json({ err: "Unauthorized" }, { status: 401 });
 
-        const userId = (session.user as any).id;
+        const userId = session.user.id;
         const { searchParams } = new URL(req.url);
         const eventId = searchParams.get("eventId");
 
