@@ -96,27 +96,20 @@ export async function POST(req: NextRequest) {
 
         const matchCount = data.matches_found || 0;
 
-        // Upsert event_attendees with cached results
-        // Upsert event_attendees with cached results
-        await prisma.eventAttendee.upsert({
-            where: {
-                event_id_attendee_id: {
-                    event_id: event.id,
-                    attendee_id: userId
-                }
-            },
-            update: {
-                matched_photos: photos,
-                match_count: matchCount,
-                accessed_at: new Date(),
-            },
-            create: {
-                event_id: event.id,
-                attendee_id: userId,
-                matched_photos: photos,
-                match_count: matchCount,
-            }
-        });
+        // Prisma has a known bug in this version where passing an Array to a Jsonb column 
+        // causes "incorrect binary data format". Using raw SQL explicitly bypasses Prisma's 
+        // buggy Rust parser and allows Postgres to safely cast the string to JSONB.
+        const serializedPhotos = JSON.stringify(photos);
+
+        await prisma.$executeRaw`
+            INSERT INTO "event_attendees" ("id", "event_id", "attendee_id", "matched_photos", "match_count", "accessed_at")
+            VALUES (${crypto.randomUUID()}, ${event.id}, ${userId}, ${serializedPhotos}::jsonb, ${matchCount}, NOW())
+            ON CONFLICT ("event_id", "attendee_id") 
+            DO UPDATE SET 
+                "matched_photos" = ${serializedPhotos}::jsonb, 
+                "match_count" = ${matchCount}, 
+                "accessed_at" = NOW()
+        `;
 
         return NextResponse.json({
             success: true,
