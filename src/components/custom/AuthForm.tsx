@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Loader2, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import { apiClient } from "@/lib/axios";
 
 export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
     const [isLogin, setIsLogin] = useState(true);
@@ -34,8 +35,8 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
                 if (onSuccess) onSuccess();
                 
                 // Redirect based on role from session
-                const sessionRes = await fetch("/api/auth/session");
-                const sessionData = await sessionRes.json();
+                const sessionRes = await apiClient.get("/api/auth/session");
+                const sessionData = sessionRes.data;
                 
                 if (sessionData?.user?.role === "organizer") {
                     window.location.href = "/organizer/dashboard";

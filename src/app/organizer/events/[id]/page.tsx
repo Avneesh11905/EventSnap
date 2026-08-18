@@ -15,6 +15,7 @@ import {
     Cpu,
     FolderUp
 } from "lucide-react";
+import { apiClient } from "@/lib/axios";
 import Link from "next/link";
 import { useUpload } from "@/components/providers/UploadProvider";
 
@@ -46,15 +47,15 @@ export default function EventDetailsPage() {
 
     const fetchEvent = useCallback(async () => {
         try {
-            const res = await fetch(`/api/events/${eventId}`);
-            const data = await res.json();
+            const res = await apiClient.get(`/api/events/${eventId}`);
+            const data = res.data;
             if (data.success) {
                 setEvent(data.event);
 
                 // Also fetch encoding count in the same load cycle
                 try {
-                    const countRes = await fetch(`/api/encode/count?eventId=${data.event.id}`);
-                    const countData = await countRes.json();
+                    const countRes = await apiClient.get(`/api/encode/count?eventId=${data.event.id}`);
+                    const countData = countRes.data;
                     if (countData.success) setEncodedCount(countData.encoded_count);
                 } catch { /* encoding count is optional */ }
             } else {
@@ -70,8 +71,8 @@ export default function EventDetailsPage() {
     const reconcileStorage = useCallback(async () => {
         if (!eventId) return;
         try {
-            const res = await fetch(`/api/events/${eventId}/reconcile`, { method: "POST" });
-            const data = await res.json();
+            const res = await apiClient.post(`/api/events/${eventId}/reconcile`);
+            const data = res.data;
             if (data.success) {
                 setEvent(prev => prev ? {
                     ...prev,
@@ -89,8 +90,8 @@ export default function EventDetailsPage() {
         const isActiveUpload = uploadingEventId === event?.id && phase === "uploading";
         if (!event?.id || isActiveUpload) return;
         if (phase === "done") {
-            fetch(`/api/encode/count?eventId=${event.id}`)
-                .then(res => res.json())
+            apiClient.get(`/api/encode/count?eventId=${event.id}`)
+                .then(res => res.data)
                 .then(data => { if (data.success) setEncodedCount(data.encoded_count); })
                 .catch(() => { });
         }
@@ -151,13 +152,8 @@ export default function EventDetailsPage() {
     const triggerBackendEncoding = async () => {
         if (!event) return;
         try {
-            const res = await fetch("/api/encode", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ eventId: event.id }),
-            });
-
-            const data = await res.json();
+            const res = await apiClient.post("/api/encode", { eventId: event.id });
+            const data = res.data;
 
             if (data.success && data.task_id) {
                 // Start tracking the Celery task in the global upload widget

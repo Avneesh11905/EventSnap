@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { updateEventSchema } from "@/lib/validations";
 import { s3, BUCKET } from "@/lib/s3";
 import { ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import { apiClient } from "@/lib/axios";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -255,9 +256,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
         try {
             const modelUrl = process.env.NEXT_PUBLIC_INFERENCE_API_URL || 'http://localhost:8000';
             // Use standardized prefix /api/events/
-            await fetch(`${modelUrl}/api/events/delete-event-table/${event.code}`, {
-                method: "DELETE"
-            });
+            await apiClient.delete(`${modelUrl}/api/events/delete-event-table/${event.code}`);
         } catch (mlErr) {
             console.error("Failed to cleanup ML database table:", mlErr);
         }

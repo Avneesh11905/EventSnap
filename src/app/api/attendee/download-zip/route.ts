@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { apiClient } from "@/lib/axios";
 
 export const dynamic = "force-dynamic";
 
@@ -39,26 +40,16 @@ export async function POST(req: NextRequest) {
         const photos = access.matched_photos;
 
         // Call main_api to start background zipping
-        const response = await fetch(`${process.env.NEXT_PUBLIC_INFERENCE_API_URL}/api/attendees/generate-zip/`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                event_id: eventId,
-                user_id: userId,
-                image_paths: photos.map(p => ({ 
-                    filename: p.file_key.split('/').pop() || p.file_key, 
-                    path: p.file_key 
-                }))
-            })
+        const response = await apiClient.post(`${process.env.NEXT_PUBLIC_INFERENCE_API_URL}/api/attendees/generate-zip/`, {
+            event_id: eventId,
+            user_id: userId,
+            image_paths: photos.map(p => ({ 
+                filename: p.file_key.split('/').pop() || p.file_key, 
+                path: p.file_key 
+            }))
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.detail || "Failed to start ZIP generation");
-        }
+        const data = response.data;
 
         // Increment download count on the event
         await prisma.event.update({

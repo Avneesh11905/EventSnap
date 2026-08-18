@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureBucketExists } from "@/lib/s3";
+import { apiClient } from "@/lib/axios";
 
 export const dynamic = "force-dynamic";
 
@@ -64,28 +65,12 @@ export async function POST(req: NextRequest) {
         }
 
         // Call main_api sort-attendee
-        const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-        };
-
-        const sortRes = await fetch(`${MAIN_API_URL}/api/attendees/sort-attendee/`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-                event_code: eventCode.toUpperCase(),
-                attendee_encodings: user.face_encoding,
-            }),
+        const sortRes = await apiClient.post(`${MAIN_API_URL}/api/attendees/sort-attendee/`, {
+            event_code: eventCode.toUpperCase(),
+            attendee_encodings: user.face_encoding,
         });
 
-        if (!sortRes.ok) {
-            const errData = await sortRes.json().catch(() => ({}));
-            return NextResponse.json(
-                { err: errData.detail || "Sort failed" },
-                { status: sortRes.status }
-            );
-        }
-
-        const data = await sortRes.json();
+        const data = sortRes.data;
 
         // Transform STORAGE paths to full URLs
         const photos = (data.photos || []).map((path: string) => ({

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useRef, useEffect } from "r
 import { useSession } from "next-auth/react";
 import { Loader2, CheckCircle, X, Cpu, Minus, XCircle } from "lucide-react";
 import Link from "next/link";
+import { apiClient } from "@/lib/axios";
 
 type UploadPhase = "idle" | "uploading" | "extracting" | "encoding" | "done" | "error";
 
@@ -198,8 +199,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
         pollRef.current = setInterval(async () => {
             try {
-                const res = await fetch(`/api/upload/status?taskId=${taskId}`);
-                const data = await res.json();
+                const res = await apiClient.get(`/api/upload/status?taskId=${taskId}`);
+                const data = res.data;
 
                 if (data.status === "PROCESSING" || data.status === "INITIALIZING") {
                     // Python backends sends: progress: "45%", we must strip the % before parseInt
@@ -276,15 +277,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 unsyncedCount = 0;
                 unsyncedMB = 0;
 
-                await fetch(`/api/events/${event.id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        photo_count: countToSync,
-                        total_size_mb: mbToSync
-                    }),
-                    signal: abortController.signal,
-                });
+                await apiClient.patch(`/api/events/${event.id}`, {
+                    photo_count: countToSync,
+                    total_size_mb: mbToSync
+                }, { signal: abortController.signal });
             } catch (err) {
                 console.error("Incremental DB sync failed", err);
             }
@@ -293,16 +289,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         try {
             // --- SMART RESUME: Check existing files in MinIO ---
             setStatusMessage("Checking existing uploads...");
-            const checkRes = await fetch("/api/upload/check", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    eventId: event.id,
-                    files: files.map(f => ({ name: f.name, size: f.size }))
-                }),
-                signal: abortController.signal,
-            });
-            const checkData = await checkRes.json();
+            const checkRes = await apiClient.post("/api/upload/check", {
+                eventId: event.id,
+                files: files.map(f => ({ name: f.name, size: f.size }))
+            }, { signal: abortController.signal });
+            const checkData = checkRes.data;
 
             let filesToUpload = files;
             let skippedCount = 0;
@@ -339,14 +330,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 ])
             };
 
-            const presignRes = await fetch("/api/upload/presigned", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(reqBody),
+            const presignRes = await apiClient.post("/api/upload/presigned", reqBody, {
                 signal: abortController.signal,
             });
 
-            const presignData = await presignRes.json();
+            const presignData = presignRes.data;
             if (!presignData.success) {
                 throw new Error(presignData.err || "Failed to generate security tokens for upload.");
             }

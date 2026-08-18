@@ -15,6 +15,7 @@ import {
     X,
     ScanFace,
 } from "lucide-react";
+import { apiClient } from "@/lib/axios";
 
 interface Photo {
     url: string;
@@ -58,8 +59,8 @@ export default function AttendeeEventDetail() {
     const checkExistingZip = async () => {
         setZipStatus('checking');
         try {
-            const res = await fetch(`/api/attendee/check-zip?eventId=${eventId}`);
-            const data = await res.json();
+            const res = await apiClient.get(`/api/attendee/check-zip?eventId=${eventId}`);
+            const data = res.data;
             if (data.exists) {
                 setZipStatus('ready');
                 setDownloadUrl(data.downloadUrl);
@@ -74,14 +75,8 @@ export default function AttendeeEventDetail() {
 
     const fetchEventDetail = async () => {
         try {
-            const res = await fetch(`/api/attendee/events/${eventId}`);
-            const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.err || "Failed to load event");
-                setLoading(false);
-                return;
-            }
+            const res = await apiClient.get(`/api/attendee/events/${eventId}`);
+            const data = res.data;
 
             setEvent(data.event);
             setPhotos(data.photos || []);
@@ -103,19 +98,8 @@ export default function AttendeeEventDetail() {
         setDownloadProgress("Starting...");
 
         try {
-            const res = await fetch("/api/attendee/download-zip", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ eventId }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.err || "Failed to start generation");
-                setZipStatus('missing');
-                return;
-            }
+            const res = await apiClient.post("/api/attendee/download-zip", { eventId });
+            const data = res.data;
 
             const taskId = data.task_id;
             if (!taskId) {
@@ -129,8 +113,8 @@ export default function AttendeeEventDetail() {
 
             const pollStatus = async () => {
                 try {
-                    const statusRes = await fetch(`/api/tasks/${taskId}`);
-                    const statusData = await statusRes.json();
+                    const statusRes = await apiClient.get(`/api/tasks/${taskId}`);
+                    const statusData = statusRes.data;
 
                     if (statusData.status === "SUCCESS" || statusData.status === "COMPLETED") {
                         setDownloadProgress("Finalizing...");

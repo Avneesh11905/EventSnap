@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { s3, BUCKET } from "@/lib/s3";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { apiClient } from "@/lib/axios";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +21,8 @@ export async function GET(req: NextRequest, context: RouteContext) {
         }
 
         // Proxy to main_api for status
-        const res = await fetch(`${process.env.NEXT_PUBLIC_INFERENCE_API_URL}/api/tasks/${taskId}`);
-
-        const data = await res.json();
+        const res = await apiClient.get(`${process.env.NEXT_PUBLIC_INFERENCE_API_URL}/api/tasks/${taskId}`);
+        const data = res.data;
 
         if (data.status === "SUCCESS" && data.result?.zip_path) {
             // Generate presigned URL for the resulting ZIP

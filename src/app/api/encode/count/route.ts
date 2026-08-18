@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { apiClient } from "@/lib/axios";
 
 const MAIN_API_URL = process.env.NEXT_PUBLIC_INFERENCE_API_URL || "http://localhost:8000";
 
@@ -38,10 +39,8 @@ export async function GET(req: NextRequest) {
         }
 
         // Proxy to main_api
-        const headers: Record<string, string> = {};
-
-        const res = await fetch(`${MAIN_API_URL}/api/events/encode-count/${event.code}`, { headers });
-        const data = await res.json();
+        const res = await apiClient.get(`${MAIN_API_URL}/api/events/encode-count/${event.code}`);
+        const data = res.data;
 
         return NextResponse.json({ success: true, ...data });
     } catch {

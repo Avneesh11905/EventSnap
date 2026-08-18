@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { apiClient } from "@/lib/axios";
 
 export async function POST(req: NextRequest) {
     try {
@@ -39,22 +40,11 @@ export async function POST(req: NextRequest) {
         // Proxy the call to the main_api server-side (no CORS issues)
         const MAIN_API_URL = process.env.NEXT_PUBLIC_INFERENCE_API_URL || "http://localhost:8000";
 
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-
-        const encodeRes = await fetch(`${MAIN_API_URL}/api/events/encode-event/`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ event_code: event.code }),
+        const encodeRes = await apiClient.post(`${MAIN_API_URL}/api/events/encode-event/`, {
+            event_code: event.code 
         });
 
-        const encodeData = await encodeRes.json();
-
-        if (!encodeRes.ok) {
-            return NextResponse.json(
-                { err: encodeData.detail || "Failed to trigger encoding" },
-                { status: encodeRes.status }
-            );
-        }
+        const encodeData = encodeRes.data;
 
         return NextResponse.json({
             success: true,

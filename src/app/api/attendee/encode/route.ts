@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { apiClient } from "@/lib/axios";
 
 export const dynamic = "force-dynamic";
 
@@ -32,27 +33,11 @@ export async function POST(req: NextRequest) {
         }
 
         // Call backend encode-attendee endpoint
-        const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-        };
-
-        const encodeRes = await fetch(`${MAIN_API_URL}/api/attendees/encode-attendee/`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-                attendee_images_base64: images,
-            }),
+        const encodeRes = await apiClient.post(`${MAIN_API_URL}/api/attendees/encode-attendee/`, {
+            attendee_images_base64: images,
         });
 
-        if (!encodeRes.ok) {
-            const errData = await encodeRes.json().catch(() => ({}));
-            return NextResponse.json(
-                { err: errData.detail || "Face encoding failed" },
-                { status: encodeRes.status }
-            );
-        }
-
-        const encodeData = await encodeRes.json();
+        const encodeData = encodeRes.data;
         const encodings = encodeData.encodings as number[][];
 
         if (!encodings || encodings.length === 0) {

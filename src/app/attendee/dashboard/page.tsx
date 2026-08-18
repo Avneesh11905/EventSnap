@@ -18,6 +18,7 @@ import {
     LogOut,
     User,
 } from "lucide-react";
+import { apiClient } from "@/lib/axios";
 
 interface AttendedEvent {
     id: string;
@@ -51,8 +52,8 @@ export default function AttendeeDashboard() {
 
     const fetchEvents = async () => {
         try {
-            const res = await fetch("/api/attendee/events");
-            const data = await res.json();
+            const res = await apiClient.get("/api/attendee/events");
+            const data = res.data;
             if (data.success) {
                 setEvents(data.events || []);
             }
@@ -66,8 +67,8 @@ export default function AttendeeDashboard() {
     const handleClearEncoding = async () => {
         setClearingEncoding(true);
         try {
-            const res = await fetch("/api/attendee/encode", { method: "DELETE" });
-            const data = await res.json();
+            const res = await apiClient.delete("/api/attendee/encode");
+            const data = res.data;
             if (data.success) {
                 await updateSession();
                 router.push("/attendee/sort");
@@ -87,8 +88,8 @@ export default function AttendeeDashboard() {
 
         setDeletingId(eventId);
         try {
-            const res = await fetch(`/api/attendee/events/${eventId}`, { method: "DELETE" });
-            const data = await res.json();
+            const res = await apiClient.delete(`/api/attendee/events/${eventId}`);
+            const data = res.data;
             if (data.success) {
                 setEvents((prev) => prev.filter((e) => e.id !== eventId));
             }

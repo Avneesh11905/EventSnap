@@ -25,6 +25,7 @@ import {
     Cpu,
     RefreshCw,
 } from "lucide-react";
+import { apiClient } from "@/lib/axios";
 import { useUpload } from "@/components/providers/UploadProvider";
 
 interface AttendeeAccess {
@@ -74,8 +75,8 @@ export default function DashboardPage() {
 
     const fetchEvents = async () => {
         try {
-            const res = await fetch("/api/events");
-            const data = await res.json();
+            const res = await apiClient.get("/api/events");
+            const data = res.data;
             if (data.success) setEvents(data.events);
         } catch {
             setError("Failed to load events");
@@ -115,12 +116,8 @@ export default function DashboardPage() {
         setCreating(true);
         setError("");
         try {
-            const res = await fetch("/api/events", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newEvent),
-            });
-            const data = await res.json();
+            const res = await apiClient.post("/api/events", newEvent);
+            const data = res.data;
             if (data.success) {
                 setEvents((prev) => [data.event, ...prev]);
                 setShowModal(false);
@@ -138,8 +135,8 @@ export default function DashboardPage() {
     const handleDelete = async (id: string) => {
         if (!confirm("Delete this event? This cannot be undone.")) return;
         try {
-            const res = await fetch(`/api/events/${id}`, { method: "DELETE" });
-            const data = await res.json();
+            const res = await apiClient.delete(`/api/events/${id}`);
+            const data = res.data;
             if (data.success) {
                 setEvents((prev) => prev.filter((e) => e.id !== id));
             }

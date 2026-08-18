@@ -16,6 +16,7 @@ import {
   Scan,
   LogIn,
 } from "lucide-react";
+import { apiClient } from "@/lib/axios";
 
 type Angle = "front" | "left" | "right";
 type Step = "encode" | "scan" | "loading" | "results";
@@ -230,20 +231,8 @@ export default function AttendeeSort() {
     try {
       const images = await Promise.all(captures.map((c) => blobToBase64(c!.blob)));
 
-      const res = await fetch("/api/attendee/encode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.err || "Face encoding failed");
-        setEncodeStep("review");
-        setEncodeLoading(false);
-        return;
-      }
+      const res = await apiClient.post("/api/attendee/encode", { images });
+      const data = res.data;
 
       // Refresh the session to pick up the new has_encoding flag
       await updateSession();
@@ -266,19 +255,8 @@ export default function AttendeeSort() {
     setError("");
 
     try {
-      const res = await fetch("/api/attendee/sort", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventCode: eventCode.toUpperCase() }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.err || "Scan failed");
-        setStep("scan");
-        return;
-      }
+      const res = await apiClient.post("/api/attendee/sort", { eventCode: eventCode.toUpperCase() });
+      const data = res.data;
 
       if (data.matchesFound > 0 && data.eventId) {
         // Redirect to the event detail page with cached results

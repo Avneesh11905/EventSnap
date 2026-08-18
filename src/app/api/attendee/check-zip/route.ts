@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { s3, BUCKET } from "@/lib/s3";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { apiClient } from "@/lib/axios";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,8 @@ export async function GET(req: NextRequest) {
         if (!eventId) return NextResponse.json({ err: "Missing eventId" }, { status: 400 });
 
         // Check main_api
-        const response = await fetch(`${process.env.NEXT_PUBLIC_INFERENCE_API_URL}/api/attendees/check-zip/${eventId}/${userId}`);
-
-        const data = await response.json();
+        const response = await apiClient.get(`${process.env.NEXT_PUBLIC_INFERENCE_API_URL}/api/attendees/check-zip/${eventId}/${userId}`);
+        const data = response.data;
 
         if (data.exists) {
             // Generate presigned URL for existing ZIP
