@@ -31,7 +31,7 @@ interface UploadContextType extends UploadState {
     isWidgetDismissed: boolean;
 }
 
-const resizeImage = (file: File, maxWidth = 640, maxHeight = 640): Promise<File> => {
+const resizeImage = (file: File, maxWidth = 1920, maxHeight = 1920): Promise<File> => {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.src = URL.createObjectURL(file);
@@ -48,8 +48,6 @@ const resizeImage = (file: File, maxWidth = 640, maxHeight = 640): Promise<File>
                     width = Math.round((width * maxHeight) / height);
                     height = maxHeight;
                 }
-            } else {
-                return resolve(file);
             }
 
             const canvas = document.createElement("canvas");
@@ -64,13 +62,13 @@ const resizeImage = (file: File, maxWidth = 640, maxHeight = 640): Promise<File>
                 (blob) => {
                     if (!blob) return reject("Canvas is empty");
                     const resizedFile = new File([blob], file.name, {
-                        type: file.type || "image/jpeg",
+                        type: "image/jpeg",
                         lastModified: Date.now(),
                     });
                     resolve(resizedFile);
                 },
-                file.type || "image/jpeg",
-                0.8
+                "image/jpeg",
+                0.6
             );
         };
         img.onerror = () => {
@@ -326,7 +324,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 eventId: event.id,
                 files: filesToUpload.flatMap(f => [
                     { name: f.name, type: f.type, folder: 'raw' },
-                    { name: f.name, type: f.type, folder: 'thumbs' }
+                    { name: f.name, type: "image/jpeg", folder: 'thumbs' }
                 ])
             };
 
@@ -362,11 +360,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                     const thumbUrlObj = batchUrls[(idx * 2) + 1];
 
                     try {
-                        // 1. Resize on the fly
-                        const thumbFile = await resizeImage(f, 640, 640);
+                        // 1. Resize on the fly (AI Processing Proxy)
+                        const proxyFile = await resizeImage(f, 1920, 1920);
 
                         // 2. Upload both concurrently
-                        const [rawRes, thumbRes] = await Promise.all([
+                        const [rawRes, proxyRes] = await Promise.all([
                             fetchWithRetry(rawUrlObj.url, {
                                 method: "PUT",
                                 body: f,
@@ -375,13 +373,13 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                             }),
                             fetchWithRetry(thumbUrlObj.url, {
                                 method: "PUT",
-                                body: thumbFile,
-                                headers: { "Content-Type": thumbFile.type || "application/octet-stream" },
+                                body: proxyFile,
+                                headers: { "Content-Type": proxyFile.type || "application/octet-stream" },
                                 signal: abortController.signal,
                             })
                         ]);
 
-                        if (!rawRes?.ok || !thumbRes?.ok) {
+                        if (!rawRes?.ok || !proxyRes?.ok) {
                             console.error(`Failed to upload ${f.name} after retries.`);
                         } else {
                             successCount++;
