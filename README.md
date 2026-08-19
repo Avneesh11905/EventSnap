@@ -29,4 +29,37 @@ Give your guests something to talk about with zero extra effort.
 
 ---
 
+## 💻 Local Development Setup
+
+This project uses **Bun**, **Next.js**, **Prisma 7**, and **Infisical** (for secure, in-memory secrets injection).
+
+### 1. Install Dependencies
+```bash
+bun install
+```
+*(Note: This will automatically generate the Prisma Client using our custom Infisical secrets wrapper.)*
+
+### 2. Configure Environment Variables
+We use Infisical to securely inject secrets directly into memory. 
+1. Copy `.env.example` to `.env`.
+2. Add your `INFISICAL_TOKEN` (or Machine Identity credentials) to the `.env` file. 
+
+*(If you are not using Infisical, you can just manually fill out the raw variables inside `.env` and the app will natively fall back to using them.)*
+
+### 3. Database Commands
+Because we inject secrets dynamically, do not use the raw `prisma` CLI. Instead, use our custom Bun shortcuts:
+```bash
+bun db:push     # Push schema changes to your database
+bun db:migrate  # Run migration files
+bun db:studio   # Open Prisma Studio to view your database
+```
+
+### 4. Start the Dev Server
+```bash
+bun run dev
+```
+The application will boot up on `http://localhost:3000`.
+
+---
+
 *Eventsnap — Making event photo sharing personal.*
