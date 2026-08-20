@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useRef, useEffect } from "r
 import { useSession } from "next-auth/react";
 import { Loader2, CheckCircle, X, Cpu, Minus, XCircle } from "lucide-react";
 import Link from "next/link";
+import axios from "axios";
 import { apiClient } from "@/lib/axios";
 
 type UploadPhase = "idle" | "uploading" | "extracting" | "encoding" | "done" | "error";
@@ -249,22 +250,26 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         abortControllerRef.current = abortController;
 
         // --- Helper for Retrying Fetches ---
-        const fetchWithRetry = async (url: string, options: any, maxRetries = 3, delay = 1000) => {
-            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const axiosUploadWithRetry = async (url: string, file: File, options: any, onProgress: (loaded: number, total: number) => void, maxRetries = 3, delay = 1000) => {
+            for (let i = 0; i < maxRetries; i++) {
                 try {
-                    const res = await fetch(url, options);
-                    if (res.ok) return res;
-                    // If not OK but we have retries left, don't throw yet
-                    if (attempt === maxRetries) return res;
+                    const res = await axios.put(url, file, {
+                        ...options,
+                        headers: { "Content-Type": file.type || "application/octet-stream" },
+                        onUploadProgress: (progressEvent) => {
+                            if (progressEvent.loaded !== undefined && progressEvent.total !== undefined) {
+                                onProgress(progressEvent.loaded, progressEvent.total);
+                            }
+                        }
+                    });
+                    if (res.status >= 200 && res.status < 300) return res;
                 } catch (err: any) {
-                    if (err.name === "AbortError" || abortController.signal.aborted) throw err;
-                    if (attempt === maxRetries) throw err;
-                    console.warn(`Fetch attempt ${attempt + 1} failed for ${url}. Retrying in ${delay}ms...`);
+                    if (axios.isCancel(err) || options.signal?.aborted) throw err;
                 }
-                await new Promise(resolve => setTimeout(resolve, delay));
-                // Check abort signal during delay
+                await new Promise(r => setTimeout(r, delay));
                 if (abortController.signal.aborted) throw new Error("Upload canceled by user.");
             }
+            return null;
         };
 
         let unsyncedCount = 0;
@@ -340,8 +345,31 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 throw new Error(presignData.err || "Failed to generate security tokens for upload.");
             }
 
+            // Setup Byte-Level Progress Tracking
+            const uploadStateMap: Record<string, { loaded: number, total: number }> = {};
+            filesToUpload.forEach(f => {
+                uploadStateMap[f.name + "_raw"] = { loaded: 0, total: f.size };
+                uploadStateMap[f.name + "_proxy"] = { loaded: 0, total: f.size * 0.1 }; // 10% estimate
+            });
+
+            const updateOverallProgress = () => {
+                let loaded = 0;
+                let total = 0;
+                Object.values(uploadStateMap).forEach(state => {
+                    loaded += state.loaded;
+                    total += state.total;
+                });
+                const uploadPct = Math.min(100, Math.round((loaded / (total || 1)) * 100));
+                
+                // Account for skipped files in the overall percentage calculation
+                const adjustedPct = Math.round((skippedCount / files.length) * 100) + Math.round((uploadPct * (filesToUpload.length / files.length)));
+
+                setProgress(adjustedPct);
+                setStatusMessage(`Uploading: ${adjustedPct}% (${successCount}/${files.length})`);
+            };
+
             // 2. Upload files in concurrent batches to S3
-            const BATCH_SIZE = 5;
+            const BATCH_SIZE = process.env.NEXT_PUBLIC_UPLOAD_BATCH_SIZE ? parseInt(process.env.NEXT_PUBLIC_UPLOAD_BATCH_SIZE) : 5;
 
             for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
                 // Check if user canceled mid-batch
@@ -352,8 +380,6 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 const batchFiles = filesToUpload.slice(i, i + BATCH_SIZE);
                 const startIndex = i * 2;
                 const batchUrls = presignData.urls.slice(startIndex, startIndex + (BATCH_SIZE * 2));
-                // If user dismissed/canceled globally, we could theoretically abort here
-                // but for now we let it finish. 
 
                 let batchSuccessCount = 0;
                 let batchTotalMB = 0;
@@ -365,52 +391,50 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                     try {
                         // 1. Resize on the fly (AI Processing Proxy)
                         const proxyFile = await resizeImage(f, 1920, 1920);
+                        // Update total estimate now that we know actual proxy size
+                        uploadStateMap[f.name + "_proxy"].total = proxyFile.size;
 
                         // 2. Upload both concurrently
                         const [rawRes, proxyRes] = await Promise.all([
-                            fetchWithRetry(rawUrlObj.url, {
-                                method: "PUT",
-                                body: f,
-                                headers: { "Content-Type": f.type || "application/octet-stream" },
+                            axiosUploadWithRetry(rawUrlObj.url, f, {
                                 signal: abortController.signal,
+                            }, (loaded, total) => {
+                                uploadStateMap[f.name + "_raw"] = { loaded, total };
+                                updateOverallProgress();
                             }),
-                            fetchWithRetry(thumbUrlObj.url, {
-                                method: "PUT",
-                                body: proxyFile,
-                                headers: { "Content-Type": proxyFile.type || "application/octet-stream" },
+                            axiosUploadWithRetry(thumbUrlObj.url, proxyFile, {
                                 signal: abortController.signal,
+                            }, (loaded, total) => {
+                                uploadStateMap[f.name + "_proxy"] = { loaded, total };
+                                updateOverallProgress();
                             })
                         ]);
 
-                        if (!rawRes?.ok || !proxyRes?.ok) {
+                        if (!rawRes || !proxyRes) {
                             console.error(`Failed to upload ${f.name} after retries.`);
                         } else {
                             successCount++;
                             totalMB += (f.size / (1024 * 1024));
                             batchSuccessCount++;
                             batchTotalMB += (f.size / (1024 * 1024));
+                            updateOverallProgress(); // Force update with new successCount
                         }
                     } catch (err: any) {
                         if (err.name === "AbortError" || abortController.signal.aborted) {
-                            throw err; // Propagate abort to stop the whole loop
+                            throw err;
                         }
                         console.error(`Fatal error uploading ${f.name}:`, err);
-                        // We continue with other files in the batch if one fails fatally
                     }
                 }));
 
-                // Update Progress State Safely (based on total files provided)
-                const currentProgress = Math.round((successCount / files.length) * 100);
-                setProgress(currentProgress);
-                setStatusMessage(`Uploading: ${currentProgress}% (${successCount}/${files.length})`);
-
                 // Persist state to survive hard refreshes during large queues
+                const currentBatchProgress = Math.round((successCount / files.length) * 100);
                 localStorage.setItem("eventsnap_live_s3_upload", JSON.stringify({
                     eventId: event.id,
                     phase: "uploading",
-                    progress: currentProgress,
+                    progress: currentBatchProgress,
                     imageCount: successCount,
-                    statusMessage: `Uploading: ${currentProgress}% (${successCount}/${files.length})`
+                    statusMessage: `Uploading: ${currentBatchProgress}% (${successCount}/${files.length})`
                 }));
 
                 // --- Incremental Database Sync ---
