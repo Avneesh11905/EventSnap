@@ -38,9 +38,9 @@ export async function POST(req: NextRequest) {
         });
 
         const encodeData = encodeRes.data;
-        const encodings = encodeData.encodings as number[][];
+        const encoding = encodeData.encoding as number[];
 
-        if (!encodings || encodings.length === 0) {
+        if (!encoding || encoding.length === 0) {
             return NextResponse.json(
                 { err: "No face encodings could be generated" },
                 { status: 400 }
@@ -50,13 +50,13 @@ export async function POST(req: NextRequest) {
         // Store encodings in users table
         await prisma.user.update({
             where: { id: userId },
-            data: { face_encoding: encodings, has_encoding: true },
+            data: { face_encoding: encoding, has_encoding: true },
         });
 
         return NextResponse.json({
             success: true,
-            encodingCount: encodings.length,
-            message: `Generated ${encodings.length} face encodings from 3 reference images`,
+            encodingCount: 1,
+            message: `Generated 1 averaged face encoding from 3 reference images`,
         });
     } catch (err: unknown) {
         console.error("Encode error:", err);

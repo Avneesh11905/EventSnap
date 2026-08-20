@@ -15,7 +15,7 @@ model User {
   image         String?
   provider      String
   role          String   @default("attendee") // "attendee" | "organizer"
-  face_encoding Json? // Storing the number[][] as JSON
+  face_encoding Json? // Storing the number[] (averaged vector) as JSON
   has_encoding  Boolean  @default(false)
   created_at    DateTime @default(now())
 

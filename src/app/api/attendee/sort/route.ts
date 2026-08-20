@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         // Call main_api sort-attendee
         const sortRes = await apiClient.post(`${MAIN_API_URL}/api/attendees/sort-attendee/`, {
             event_code: eventCode.toUpperCase(),
-            attendee_encodings: user.face_encoding,
+            attendee_encoding: user.face_encoding,
         });
 
         const data = sortRes.data;
