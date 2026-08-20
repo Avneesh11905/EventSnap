@@ -331,8 +331,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             const reqBody = {
                 eventId: event.id,
                 files: filesToUpload.flatMap(f => [
-                    { name: f.name, type: f.type, folder: 'raw' },
-                    { name: f.name, type: "image/jpeg", folder: 'thumbs' }
+                    { name: f.name, type: f.type, folder: 'raw', size: f.size },
+                    { name: f.name, type: "image/jpeg", folder: 'thumbs', size: f.size }
                 ])
             };
 

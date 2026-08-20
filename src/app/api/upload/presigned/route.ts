@@ -48,14 +48,17 @@ export async function POST(req: NextRequest) {
         const uuidMap = new Map<string, string>();
 
         const urls = await Promise.all(
-            files.map(async (file: { name: string; type: string; folder?: string }) => {
+            files.map(async (file: { name: string; type: string; folder?: string; size?: number }) => {
                 // Strip any nested directory paths from the filename (e.g., "folder/image.jpg" -> "image.jpg")
                 const basename = file.name.split("/").pop() || file.name;
                 const folderPath = file.folder ? `${folderName}/${file.folder}` : folderName;
                 
-                // Get or generate UUID for this filename
+                // Generate a deterministic UUID based on eventId, basename, and size to ensure idempotency
+                // This prevents duplicates if a user cancels an upload and retries it.
                 if (!uuidMap.has(basename)) {
-                    uuidMap.set(basename, crypto.randomUUID());
+                    const hash = require('crypto').createHash('md5').update(`${eventId}-${basename}-${file.size || 0}`).digest('hex');
+                    const deterministicUuid = `${hash.slice(0,8)}-${hash.slice(8,12)}-${hash.slice(12,16)}-${hash.slice(16,20)}-${hash.slice(20,32)}`;
+                    uuidMap.set(basename, deterministicUuid);
                 }
                 const fileUuid = uuidMap.get(basename);
 
