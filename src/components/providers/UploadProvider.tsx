@@ -192,6 +192,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         setPhase("encoding");
         setEncodeProgress(0);
         setStatusMessage("Queued for processing...");
+        setIsWidgetDismissed(false);
+        setIsWidgetMinimized(false);
 
         localStorage.setItem("eventsnap_active_upload", JSON.stringify({ taskId, eventId }));
 
@@ -239,6 +241,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         setImageCount(0);
         setUploadingEventId(event.id);
         setStatusMessage(`Preparing ${files.length} photos...`);
+        setIsWidgetDismissed(false);
         setIsWidgetMinimized(false);
 
         if (pollRef.current) clearInterval(pollRef.current);

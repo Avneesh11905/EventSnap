@@ -42,7 +42,6 @@ export default function AttendeeSort() {
   const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const router = useRouter();
   const hasEncoding = session?.user?.hasEncoding ?? false;
-  const isOrganizer = session?.user?.role === "organizer";
 
   // Flow state
   const [step, setStep] = useState<Step>("encode");
@@ -66,17 +65,13 @@ export default function AttendeeSort() {
   // Set initial step based on encoding status
   useEffect(() => {
     if (sessionStatus === "authenticated") {
-      if (isOrganizer) {
-        router.replace("/organizer/dashboard");
-        return;
-      }
       if (hasEncoding) {
         setStep("scan");
       } else {
         setStep("encode");
       }
     }
-  }, [sessionStatus, hasEncoding, isOrganizer]);
+  }, [sessionStatus, hasEncoding]);
 
   // Cleanup camera on unmount
   useEffect(() => {

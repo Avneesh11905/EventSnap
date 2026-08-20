@@ -3,8 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { updateEventSchema } from "@/lib/validations";
-import { s3, BUCKET } from "@/lib/s3";
-import { ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { apiClient } from "@/lib/axios";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -210,55 +208,13 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
             return NextResponse.json({ err: "Not authorized" }, { status: 403 });
         }
 
-        // Helper to delete all objects with a prefix
-        async function deleteS3Folder(prefix: string) {
-            let isTruncated = true;
-            let continuationToken: string | undefined = undefined;
-
-            while (isTruncated) {
-                const listRes: any = await s3.send(new ListObjectsV2Command({
-                    Bucket: BUCKET,
-                    Prefix: prefix,
-                    ContinuationToken: continuationToken,
-                }));
-
-                const objects = listRes.Contents;
-                if (objects && objects.length > 0) {
-                    await s3.send(new DeleteObjectsCommand({
-                        Bucket: BUCKET,
-                        Delete: {
-                            Objects: objects.map((obj: any) => ({ Key: obj.Key })),
-                            Quiet: true,
-                        },
-                    }));
-                }
-
-                isTruncated = !!listRes.IsTruncated;
-                continuationToken = listRes.NextContinuationToken;
-            }
-        }
-
-        // ─── MinIO Cleanup: Photos ───
-        try {
-            await deleteS3Folder(`event/${event.code}/`);
-        } catch (s3Err) {
-            console.error("Failed to cleanup Photos folder:", s3Err);
-        }
-
-        // ─── MinIO Cleanup: ZIPs ───
-        try {
-            await deleteS3Folder(`zip/${id}/`);
-        } catch (s3Err) {
-            console.error("Failed to cleanup ZIPs folder:", s3Err);
-        }
-
-        // ─── ML Backend Table Cleanup ───
+        //  ML Backend Table & MinIO Cleanup (Async) 
         try {
             const modelUrl = process.env.NEXT_PUBLIC_INFERENCE_API_URL || 'http://localhost:8000';
-            // Use standardized prefix /api/events/
-            await apiClient.delete(`${modelUrl}/api/events/delete-event-table/${event.code}`);
+            // Backend celery task handles pgvector delete + S3 folder wipe
+            await apiClient.delete(`${modelUrl}/api/events/delete-event-table/${event.code}?event_id=${id}`);
         } catch (mlErr) {
-            console.error("Failed to cleanup ML database table:", mlErr);
+            console.error("Failed to cleanup ML database table and S3:", mlErr);
         }
 
         // CASCADE will handle event_attendees cleanup
