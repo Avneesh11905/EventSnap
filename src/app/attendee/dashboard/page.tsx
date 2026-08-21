@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
     Camera,
     Loader2,
+    X,
     Calendar,
     ImageIcon,
     ChevronRight,
@@ -40,9 +41,14 @@ export default function AttendeeDashboard() {
 
     const [events, setEvents] = useState<AttendedEvent[]>([]);
     const [loading, setLoading] = useState(true);
-    const [clearingEncoding, setClearingEncoding] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeletingEncoding, setIsDeletingEncoding] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [showScanModal, setShowScanModal] = useState(false);
+    const [scanCode, setScanCode] = useState("");
+    const [isScanning, setIsScanning] = useState(false);
+    const [scanError, setScanError] = useState("");
 
     useEffect(() => {
         if (sessionStatus === "authenticated") {
@@ -64,19 +70,41 @@ export default function AttendeeDashboard() {
         }
     };
 
-    const handleClearEncoding = async () => {
-        setClearingEncoding(true);
+    const handleScanEvent = async () => {
+        if (!scanCode || scanCode.length !== 6) return;
+        setIsScanning(true);
+        setScanError("");
         try {
-            const res = await apiClient.delete("/api/attendee/encode");
+            const res = await apiClient.post("/api/attendee/sort", { eventCode: scanCode.toUpperCase() });
             const data = res.data;
-            if (data.success) {
-                await updateSession();
-                router.push("/attendee/sort");
+            if (data.matchesFound > 0 && data.eventId) {
+                router.push("/attendee/events/" + data.eventId);
+            } else {
+                setScanError("No matching photos found for this event.");
             }
         } catch {
-            // silently fail
+            setScanError("Network error during scan. Ensure code is valid.");
         } finally {
-            setClearingEncoding(false);
+            setIsScanning(false);
+        }
+    };
+
+    const handleClearEncoding = () => {
+        router.push("/attendee/setup?rescan=true");
+    };
+
+    const handleDeleteEncoding = async () => {
+        setIsDeletingEncoding(true);
+        try {
+            const res = await apiClient.delete("/api/attendee/encode");
+            if (res.data.success) {
+                await updateSession();
+                setShowDeleteModal(false);
+            }
+        } catch (error) {
+            console.error("Failed to delete encoding:", error);
+        } finally {
+            setIsDeletingEncoding(false);
         }
     };
 
@@ -133,12 +161,7 @@ export default function AttendeeDashboard() {
                             <Calendar size={16} /> Organizer Dashboard
                         </Link>
                     )}
-                    <Link
-                        href="/attendee/sort"
-                        className="btn-primary flex items-center gap-2 text-sm"
-                    >
-                        <Search size={16} /> Scan Event
-                    </Link>
+                    <button onClick={() => setShowScanModal(true)} className="btn-primary flex items-center gap-2 text-sm"><Search size={16} /> Scan Event</button>
                 </div>
             </div>
 
@@ -169,20 +192,23 @@ export default function AttendeeDashboard() {
                         </div>
                     </div>
                     {hasEncoding ? (
-                        <button
-                            onClick={handleClearEncoding}
-                            disabled={clearingEncoding}
-                            className="btn-ghost flex items-center gap-2"
-                        >
-                            {clearingEncoding ? (
-                                <Loader2 size={16} className="animate-spin" />
-                            ) : (
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleClearEncoding}
+                                className="btn-ghost flex items-center gap-2"
+                            >
                                 <RefreshCw size={16} />
-                            )}
-                            Re-scan
-                        </button>
+                                Re-scan
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteModal(true)}
+                                className="btn-ghost flex items-center gap-2 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
                     ) : (
-                        <Link href="/attendee/sort" className="btn-primary flex items-center gap-2">
+                        <Link href="/attendee/setup" className="btn-primary flex items-center gap-2">
                             <Camera size={16} /> Set Up
                         </Link>
                     )}
@@ -209,9 +235,7 @@ export default function AttendeeDashboard() {
                     <p className="text-[14px] text-[var(--foreground-secondary)] mb-6 max-w-sm mx-auto">
                         Enter an event code to find your photos instantly.
                     </p>
-                    <Link href="/attendee/sort" className="btn-primary inline-flex items-center gap-2">
-                        <Search size={16} /> Scan Your First Event
-                    </Link>
+                    <button onClick={() => setShowScanModal(true)} className="btn-primary inline-flex items-center gap-2"><Search size={16} /> Scan Your First Event</button>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -283,6 +307,80 @@ export default function AttendeeDashboard() {
                             )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Delete Encoding Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="glass-card rounded-xl p-6 w-full max-w-sm shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                                <Trash2 size={18} className="text-red-500" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-[var(--foreground)]">Delete Face Scan?</h3>
+                        </div>
+                        <p className="text-[14px] text-[var(--foreground-secondary)] mb-6">
+                            This will permanently remove your face data from our systems. You will need to set up a new scan to find your photos in future events.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                disabled={isDeletingEncoding}
+                                className="btn-ghost flex-1 text-[var(--foreground-secondary)] hover:text-white"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteEncoding}
+                                disabled={isDeletingEncoding}
+                                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold h-11 px-4 rounded-md flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                            >
+                                {isDeletingEncoding ? (
+                                    <><Loader2 size={16} className="animate-spin" /> Deleting...</>
+                                ) : (
+                                    "Yes, Delete"
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Scan Event Modal */}
+            {showScanModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="glass-card rounded-xl p-6 w-full max-w-sm shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-[var(--foreground)]">Scan Event</h3>
+                            <button onClick={() => { setShowScanModal(false); setScanError(""); setScanCode(""); }} className="text-[var(--foreground-secondary)] hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <p className="text-[14px] text-[var(--foreground-secondary)] mb-4">
+                            Enter the 6-character event code to find your photos.
+                        </p>
+                        <input
+                            type="text"
+                            value={scanCode}
+                            onChange={(e) => setScanCode(e.target.value.toUpperCase())}
+                            placeholder="ENTER 6 CHARACTERS"
+                            maxLength={6}
+                            className="input-field text-center text-lg font-mono tracking-[0.2em] uppercase h-12 mb-4 placeholder:tracking-normal placeholder:font-sans w-full"
+                        />
+                        {scanError && (
+                            <div className="bg-red-950 border border-red-900 rounded-md px-4 py-3 text-red-400 text-sm mb-4">
+                                {scanError}
+                            </div>
+                        )}
+                        <button
+                            onClick={handleScanEvent}
+                            disabled={scanCode.length !== 6 || isScanning}
+                            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {isScanning ? <><Loader2 size={16} className="animate-spin" /> Scanning...</> : <><Search size={16} /> Find My Photos</>}
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

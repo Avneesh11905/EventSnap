@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useSession, signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Camera,
   Loader2,
@@ -19,7 +19,6 @@ import {
 import { apiClient } from "@/lib/axios";
 
 type Angle = "front" | "left" | "right";
-type Step = "encode" | "scan" | "loading" | "results";
 
 interface CapturedImage {
   blob: Blob;
@@ -28,32 +27,26 @@ interface CapturedImage {
   height: number;
 }
 
-interface MatchedPhoto {
-  url: string;
-  filename: string;
-  path: string;
-}
-
 const ANGLE_CONFIG: { key: Angle; label: string; instruction: string; icon: string }[] = [
   { key: "front", label: "Front", instruction: "Look straight at the camera", icon: "😐" },
   { key: "left", label: "Left Side", instruction: "Turn your head to the left", icon: "👈" },
   { key: "right", label: "Right Side", instruction: "Turn your head to the right", icon: "👉" },
 ];
 
-export default function AttendeeSort() {
+export default function AttendeeSetup() {
   const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const hasEncoding = session?.user?.hasEncoding ?? false;
 
   // Flow state
-  const [step, setStep] = useState<Step>("encode");
-  const [eventCode, setEventCode] = useState("");
-  const [error, setError] = useState("");
+      const [error, setError] = useState("");
   const [multiFaceErrors, setMultiFaceErrors] = useState<{ image_index: number, bboxes: number[][], issue?: string }[]>([]);
 
   // Camera state
   const [currentAngle, setCurrentAngle] = useState(0);
   const [captures, setCaptures] = useState<(CapturedImage | null)[]>([null, null, null]);
+  const [backupCapture, setBackupCapture] = useState<{ index: number, data: CapturedImage } | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -63,21 +56,19 @@ export default function AttendeeSort() {
   const allCaptured = captures.every((c) => c !== null);
 
   // Results state
-  const [matchedPhotos, setMatchedPhotos] = useState<MatchedPhoto[]>([]);
-
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Set initial step based on encoding status
+  // Redirect to dashboard if they already have an encoding and aren't rescanning
   useEffect(() => {
     if (sessionStatus === "authenticated") {
-      if (hasEncoding) {
-        setStep("scan");
-      } else {
-        setStep("encode");
+      const isRescan = searchParams?.get("rescan") === "true";
+      if (hasEncoding && !isRescan) {
+        router.replace("/attendee/dashboard");
       }
     }
-  }, [sessionStatus, hasEncoding]);
+  }, [sessionStatus, hasEncoding, searchParams, router]);
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -88,10 +79,10 @@ export default function AttendeeSort() {
 
   // Attach stream to video element
   useEffect(() => {
-    if (cameraStream && videoRef.current) {
+    if (videoRef.current) {
       videoRef.current.srcObject = cameraStream;
     }
-  }, [cameraStream, cameraActive]);
+  }, [cameraStream]);
 
   // ─── Camera ───────────────────────────────────────
 
@@ -116,7 +107,10 @@ export default function AttendeeSort() {
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
 
-      setCameraStream(stream);
+      setCameraStream((prev) => {
+        if (prev) prev.getTracks().forEach((t) => t.stop());
+        return stream;
+      });
       setCameraActive(true);
       setError("");
     } catch (err: any) {
@@ -131,12 +125,14 @@ export default function AttendeeSort() {
   }, []);
 
   const stopCamera = useCallback(() => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((t) => t.stop());
-      setCameraStream(null);
-    }
+    setCameraStream((prev) => {
+      if (prev) {
+        prev.getTracks().forEach((t) => t.stop());
+      }
+      return null;
+    });
     setCameraActive(false);
-  }, [cameraStream]);
+  }, []);
 
   const capturePhoto = useCallback(() => {
     const video = videoRef.current;
@@ -169,13 +165,17 @@ export default function AttendeeSort() {
             };
             return next;
           });
+          if (backupCapture) {
+            URL.revokeObjectURL(backupCapture.data.previewUrl);
+            setBackupCapture(null);
+          }
           stopCamera();
         }
       },
       "image/jpeg",
       0.9
     );
-  }, [currentAngle, stopCamera]);
+  }, [currentAngle, stopCamera, backupCapture]);
 
   const retakeCurrentAngle = useCallback(() => {
     setCaptures((prev) => {
@@ -222,15 +222,30 @@ export default function AttendeeSort() {
   const retakeFromReview = useCallback((index: number) => {
     setCurrentAngle(index);
     setEncodeStep("capture");
-    setMultiFaceErrors((prev) => prev.filter(err => err.image_index !== index));
+    setMultiFaceErrors((prev) => prev.filter((err) => err.image_index !== index));
     setCaptures((prev) => {
       const next = [...prev];
-      if (next[index]?.previewUrl) URL.revokeObjectURL(next[index]!.previewUrl);
+      if (next[index]) {
+        setBackupCapture({ index, data: next[index]! });
+      }
       next[index] = null;
       return next;
     });
     startCamera();
   }, [startCamera]);
+
+  const cancelRecapture = useCallback(() => {
+    if (backupCapture) {
+      setCaptures((prev) => {
+        const next = [...prev];
+        next[backupCapture.index] = backupCapture.data;
+        return next;
+      });
+      setBackupCapture(null);
+      stopCamera();
+      setEncodeStep("review");
+    }
+  }, [backupCapture, stopCamera]);
 
   // ─── Encode ───────────────────────────────────────
 
@@ -261,7 +276,7 @@ export default function AttendeeSort() {
 
       // Refresh the session to pick up the new has_encoding flag
       await updateSession();
-      setStep("scan");
+      router.replace("/attendee/dashboard");
     } catch (err: any) {
       const errorType = err.response?.data?.type;
       if (
@@ -284,28 +299,6 @@ export default function AttendeeSort() {
 
   // ─── Sort/Scan ────────────────────────────────────
 
-  const handleScan = async () => {
-    if (!eventCode || eventCode.length !== 6) return;
-    setStep("loading");
-    setError("");
-
-    try {
-      const res = await apiClient.post("/api/attendee/sort", { eventCode: eventCode.toUpperCase() });
-      const data = res.data;
-
-      if (data.matchesFound > 0 && data.eventId) {
-        // Redirect to the event detail page with cached results
-        router.push(`/attendee/events/${data.eventId}`);
-      } else {
-        setError("No matching photos found for this event.");
-        setStep("scan");
-      }
-    } catch {
-      setError("Network error during scan.");
-      setStep("scan");
-    }
-  };
-
   const angleConfig = ANGLE_CONFIG[currentAngle];
   const currentCapture = captures[currentAngle];
 
@@ -326,12 +319,12 @@ export default function AttendeeSort() {
           <div className="w-16 h-16 rounded-full bg-[var(--card-hover)] border border-[var(--border)] flex items-center justify-center mx-auto mb-6">
             <Camera size={28} className="text-[var(--foreground-secondary)]" />
           </div>
-          <h1 className="text-2xl font-bold mb-2 text-[var(--foreground)]">Find Your Photos</h1>
+          <h1 className="text-2xl font-bold mb-2 text-[var(--foreground)]">Face Scan Setup</h1>
           <p className="text-[var(--foreground-secondary)] text-[14px] mb-8">
-            Sign in to find your event photos using AI face recognition.
+            Sign in to set up your face scan for AI photo matching.
           </p>
           <button
-            onClick={() => signIn(undefined, { callbackUrl: "/attendee/sort" })}
+            onClick={() => signIn(undefined, { callbackUrl: "/attendee/setup" })}
             className="btn-primary w-full flex items-center justify-center gap-2"
           >
             <LogIn size={16} /> Sign In to Continue
@@ -346,30 +339,26 @@ export default function AttendeeSort() {
     <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center px-4 py-6">
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-sm">
         {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-bold mb-1 text-[var(--foreground)]">
-            {step === "encode" && encodeStep === "capture" && `Step ${currentAngle + 1} of 3`}
-            {step === "encode" && encodeStep === "review" && "Review Photos"}
-            {step === "encode" && encodeStep === "encoding" && "Encoding Face..."}
-            {step === "scan" && "Find Your Photos"}
-            {step === "loading" && "Scanning..."}
-            {step === "results" && `${matchedPhotos.length} Photo${matchedPhotos.length !== 1 ? "s" : ""} Found`}
-          </h1>
-          <p className="text-[var(--foreground-secondary)] text-[14px]">
-            {step === "encode" && encodeStep === "capture" && angleConfig.instruction}
-            {step === "encode" && encodeStep === "review" && "Tap any photo to retake it."}
-            {step === "encode" && encodeStep === "encoding" && "Processing your face data..."}
-            {step === "scan" && "Enter an event code to search."}
-            {step === "loading" && "Matching against event photos..."}
-            {step === "results" && ""}
+        <div className="mb-4">
+          <div className="relative flex items-center justify-center mb-1">
+            <h1 className="text-xl font-bold text-[var(--foreground)]">
+              {encodeStep === "capture" && `Step ${currentAngle + 1} of 3`}
+              {encodeStep === "review" && "Review Photos"}
+              {encodeStep === "encoding" && "Encoding Face..."}
+            </h1>
+          </div>
+          <p className="text-center text-[var(--foreground-secondary)] text-[14px]">
+            {encodeStep === "capture" && angleConfig.instruction}
+            {encodeStep === "review" && "Tap any photo to retake it."}
+            {encodeStep === "encoding" && "Processing your face data..."}
           </p>
         </div>
 
         {/* Progress dots for encode */}
-        {step === "encode" && (encodeStep === "capture" || encodeStep === "review") && (
-          <div className="flex items-center justify-center gap-2 mb-6">
+        {(encodeStep === "capture" || encodeStep === "review") && (
+          <div className="flex items-center justify-center gap-2 mb-4">
             {ANGLE_CONFIG.map((_, i) => (
               <div
                 key={i}
@@ -385,8 +374,8 @@ export default function AttendeeSort() {
         )}
 
         {/* ── ENCODE STEP — Camera Capture ── */}
-        {step === "encode" && encodeStep === "capture" && (
-          <div className="space-y-4">
+        {encodeStep === "capture" && (
+          <div className="space-y-3">
             {error && (
               <div className="bg-red-950 border border-red-900 rounded-md px-4 py-3 text-red-400 text-[14px] mb-4 flex items-center justify-between">
                 <span className="break-all pr-2">{error}</span>
@@ -405,14 +394,19 @@ export default function AttendeeSort() {
                 <p className="text-[14px] text-[var(--foreground-secondary)] mb-6">
                   We need 3 photos of your face to find you in event photos.
                 </p>
-                <button onClick={startCapture} className="btn-primary flex items-center justify-center gap-2 mx-auto">
-                  <Camera size={16} /> Start Face Scan
-                </button>
+                <div className="flex flex-col gap-3">
+                  <button onClick={startCapture} className="btn-primary flex items-center justify-center gap-2 mx-auto w-full">
+                    <Camera size={16} /> Start Face Scan
+                  </button>
+                    <button onClick={() => router.push("/attendee/dashboard")} className="btn-ghost flex items-center justify-center gap-2 mx-auto w-full text-[var(--foreground-secondary)]">
+                      Cancel
+                    </button>
+                </div>
               </div>
             )}
 
             {!cameraActive && !currentCapture && (isStartingCamera || captures.some(c => c !== null)) && (
-              <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl aspect-[4/5] flex flex-col items-center justify-center text-[var(--foreground-secondary)] ring-1 ring-zinc-800">
+              <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl aspect-square flex flex-col items-center justify-center text-[var(--foreground-secondary)] ring-1 ring-zinc-800">
                 <Loader2 size={32} className="animate-spin mb-4" />
                 <p className="text-sm font-medium">Starting Camera...</p>
               </div>
@@ -425,7 +419,7 @@ export default function AttendeeSort() {
                   <p className="font-medium text-[14px] text-[var(--foreground)]">{angleConfig.label}</p>
                 </div>
 
-                <div className="relative rounded-xl overflow-hidden aspect-[4/5] bg-[var(--card-hover)] ring-1 ring-zinc-800">
+                <div className="relative rounded-xl overflow-hidden aspect-square bg-[var(--card-hover)] ring-1 ring-zinc-800">
                   <video
                     ref={videoRef}
                     autoPlay
@@ -435,27 +429,37 @@ export default function AttendeeSort() {
                     style={{ transform: "scaleX(-1)" }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-40 h-48 rounded-[100px] border-2 border-zinc-100/20 border-dashed" />
+                    <div className="w-48 h-48 rounded-full border-2 border-zinc-100/20 border-dashed" />
                   </div>
                   <div className="absolute top-3 left-3 bg-[var(--card-hover)]/80 backdrop-blur-sm rounded-md px-2 py-1 text-[11px] text-[var(--foreground-secondary)] font-medium border border-[var(--border)]">
                     {currentAngle + 1} / 3
                   </div>
                 </div>
 
-                <button onClick={capturePhoto} className="btn-primary w-full flex items-center justify-center gap-2">
-                  <Camera size={16} /> Capture
-                </button>
+                <div className="flex gap-3">
+                  {backupCapture && (
+                    <button onClick={cancelRecapture} className="btn-ghost flex-1 flex items-center justify-center gap-2 bg-[var(--card-hover)] border border-[var(--border)] text-[var(--foreground-secondary)]">
+                      <X size={16} /> Cancel
+                    </button>
+                  )}
+                  <button onClick={() => router.push("/attendee/dashboard")} className="btn-ghost w-full flex items-center justify-center gap-2 text-[var(--foreground-secondary)]">
+                    Cancel 
+                  </button>
+                  <button onClick={capturePhoto} className="btn-primary flex items-center justify-center gap-2  w-full">
+                    <Camera size={16} /> Capture
+                  </button>
+                </div>
               </>
             )}
 
             {currentCapture && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-md px-4 py-2 flex items-center justify-center gap-3">
                   <span className="text-lg">{angleConfig.icon}</span>
                   <p className="font-medium text-[14px] text-[var(--foreground)]">{angleConfig.label}</p>
                 </div>
 
-                <div className="relative rounded-xl overflow-hidden aspect-[4/5] ring-1 ring-zinc-800 bg-[var(--card-hover)]">
+                <div className="relative rounded-xl overflow-hidden aspect-square ring-1 ring-zinc-800 bg-[var(--card-hover)]">
                   <Image src={currentCapture.previewUrl} alt={`${angleConfig.label} capture`} fill className="object-cover" />
                   <div className="absolute top-3 right-3">
                     <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-md p-1.5">
@@ -478,7 +482,7 @@ export default function AttendeeSort() {
         )}
 
         {/* ── ENCODE STEP — Review ── */}
-        {step === "encode" && encodeStep === "review" && (
+        {encodeStep === "review" && (
           <div className="space-y-6">
             <div className="grid grid-cols-3 gap-3">
               {ANGLE_CONFIG.map((angle, i) => {
@@ -486,7 +490,7 @@ export default function AttendeeSort() {
                 return (
                   <div key={angle.key} className="space-y-2">
                     <div
-                      className={`relative rounded-md overflow-hidden aspect-[3/4] ring-2 bg-[var(--card-hover)] group cursor-pointer ${
+                      className={`relative rounded-md overflow-hidden aspect-square ring-2 bg-[var(--card-hover)] group cursor-pointer ${
                         multiFaceError ? "ring-red-500" : "ring-zinc-800"
                       }`}
                       onClick={() => retakeFromReview(i)}
@@ -547,30 +551,37 @@ export default function AttendeeSort() {
               </div>
             )}
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => { startCapture(); }}
-                className="btn-ghost flex-1 flex items-center justify-center gap-2 bg-[var(--card-hover)] border border-[var(--border)]"
-              >
-                <ChevronLeft size={16} /> Retake All
-              </button>
-              <button
-                onClick={handleEncode}
-                disabled={!allCaptured || encodeLoading}
-                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {encodeLoading ? (
-                  <><Loader2 size={16} className="animate-spin" /> Encoding...</>
-                ) : (
-                  <><Scan size={16} /> Encode Face</>
-                )}
-              </button>
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { startCapture(); }}
+                  className="btn-ghost flex-1 flex items-center justify-center gap-2 bg-[var(--card-hover)] border border-[var(--border)]"
+                >
+                  <ChevronLeft size={16} /> Retake All
+                </button>
+                <button
+                  onClick={handleEncode}
+                  disabled={!allCaptured || encodeLoading}
+                  className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {encodeLoading ? (
+                    <><Loader2 size={16} className="animate-spin" /> Encoding...</>
+                  ) : (
+                    <><Scan size={16} /> Encode Face</>
+                  )}
+                </button>
+              </div>
+              {searchParams?.get("rescan") === "true" && (
+                <button onClick={() => router.push("/attendee/dashboard")} className="btn-ghost w-full flex items-center justify-center gap-2 text-[var(--foreground-secondary)]">
+                  Cancel Rescan
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {/* ── ENCODE STEP — Encoding in progress ── */}
-        {step === "encode" && encodeStep === "encoding" && (
+        {encodeStep === "encoding" && (
           <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl p-10 text-center">
             <Loader2 size={32} className="animate-spin text-[var(--foreground-secondary)] mx-auto mb-4" />
             <p className="font-semibold text-[var(--foreground)] mb-1">Encoding Your Face...</p>
@@ -580,101 +591,6 @@ export default function AttendeeSort() {
           </div>
         )}
 
-        {/* ── SCAN STEP ── */}
-        {step === "scan" && (
-          <div className="space-y-6">
-            <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                  <CheckCircle size={16} className="text-emerald-500" />
-                </div>
-                <div>
-                  <p className="text-[14px] font-semibold text-[var(--foreground)]">Face Encoded</p>
-                  <p className="text-[13px] text-[var(--foreground-secondary)]">Your face data is ready for matching.</p>
-                </div>
-              </div>
-
-              <label className="text-[13px] font-medium text-[var(--foreground-secondary)] mb-2 block">Event Code</label>
-              <input
-                type="text"
-                value={eventCode}
-                onChange={(e) => setEventCode(e.target.value.toUpperCase())}
-                placeholder="ENTER 6 CHARACTERS"
-                maxLength={6}
-                className="input-field text-center text-lg font-mono tracking-[0.2em] uppercase h-12 placeholder:tracking-normal placeholder:font-sans"
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-950 border border-red-900 rounded-md px-4 py-3 text-red-400 text-sm flex items-center justify-between">
-                {error}
-                <button onClick={() => setError("")}><X size={16} /></button>
-              </div>
-            )}
-
-            <button
-              onClick={handleScan}
-              disabled={eventCode.length !== 6}
-              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <Search size={16} /> Find My Photos
-            </button>
-          </div>
-        )}
-
-        {/* ── LOADING ── */}
-        {step === "loading" && (
-          <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl p-10 text-center">
-            <Loader2 size={32} className="animate-spin text-[var(--foreground-secondary)] mx-auto mb-4" />
-            <p className="font-semibold text-[var(--foreground)] mb-1">Scanning event photos...</p>
-            <p className="text-[14px] text-[var(--foreground-secondary)]">Matching your face against the event album</p>
-          </div>
-        )}
-
-        {/* ── RESULTS ── */}
-        {step === "results" && (
-          <div className="space-y-6">
-            {matchedPhotos.length > 0 ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2 text-[var(--foreground)]">
-                    <CheckCircle size={18} className="text-emerald-500" />
-                    {matchedPhotos.length} photo{matchedPhotos.length !== 1 ? "s" : ""} found
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {matchedPhotos.map((photo, i) => (
-                    <div key={i} className="relative group rounded-md overflow-hidden aspect-square bg-[var(--card-hover)] ring-1 ring-zinc-800">
-                      <Image src={photo.url} alt={photo.filename} fill className="object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="absolute bottom-0 left-0 right-0 p-3">
-                          <p className="text-xs text-[var(--foreground)] truncate">{photo.filename}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl p-10 text-center">
-                <p className="text-lg font-semibold mb-2 text-[var(--foreground)]">No photos found</p>
-                <p className="text-[14px] text-[var(--foreground-secondary)] mb-4">
-                  We couldn&apos;t find any matching photos. Try a different event code.
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setStep("scan"); setMatchedPhotos([]); setEventCode(""); }}
-                className="btn-ghost flex-1 flex items-center justify-center gap-2"
-              >
-                <Search size={16} /> New Search
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
