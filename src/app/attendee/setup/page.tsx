@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import Image from "next/image";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -33,7 +33,7 @@ const ANGLE_CONFIG: { key: Angle; label: string; instruction: string; icon: stri
   { key: "right", label: "Right Side", instruction: "Turn your head to the right", icon: "👉" },
 ];
 
-export default function AttendeeSetup() {
+function AttendeeSetupContent() {
   const { data: session, status: sessionStatus, update: updateSession } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -593,5 +593,13 @@ export default function AttendeeSetup() {
 
       </div>
     </div>
+  );
+}
+
+export default function AttendeeSetup() {
+  return (
+    <Suspense fallback={<div className="min-h-[calc(100vh-64px)] flex items-center justify-center"><Loader2 size={32} className="animate-spin text-[var(--foreground-secondary)]" /></div>}>
+      <AttendeeSetupContent />
+    </Suspense>
   );
 }
