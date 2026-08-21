@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ensureBucketExists } from "@/lib/s3";
 import { apiClient } from "@/lib/axios";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +14,6 @@ const STORAGE_BUCKET = process.env.STORAGE_BUCKET_NAME || "";
 // POST /api/attendee/sort — Sort photos, cache results in event_attendees
 export async function POST(req: NextRequest) {
     try {
-        await ensureBucketExists();
-
         const session = await getServerSession(authOptions);
         if (!session?.user?.email) {
             return NextResponse.json({ err: "Not authenticated" }, { status: 401 });
@@ -124,9 +121,18 @@ export async function POST(req: NextRequest) {
             matchesFound: matchCount,
             photos,
         });
-    } catch (err: unknown) {
+    } catch (err: any) {
         console.error("Sort error:", err);
-        const message = err instanceof Error ? err.message : "Sort failed";
-        return NextResponse.json({ err: message }, { status: 500 });
+        let message = "Sort failed";
+        let status = 500;
+        
+        if (err.response?.data) {
+            message = err.response.data.error || err.response.data.detail || err.message;
+            status = err.response.status || 500;
+        } else if (err instanceof Error) {
+            message = err.message;
+        }
+        
+        return NextResponse.json({ err: message }, { status });
     }
 }

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { s3, BUCKET, ensureBucketExists } from "@/lib/s3";
+import { s3, BUCKET } from "@/lib/s3";
 import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
     try {
@@ -37,8 +39,6 @@ export async function POST(req: NextRequest) {
         if (!event) {
             return NextResponse.json({ err: "Event not found or unauthorized" }, { status: 404 });
         }
-
-        await ensureBucketExists();
 
         // Query Storage for objects under this event's raw/ folder
         const prefix = `event/${event.code.endsWith('/') ? event.code : event.code + '/'}raw/`;

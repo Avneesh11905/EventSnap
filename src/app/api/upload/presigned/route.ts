@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { s3, BUCKET, ensureBucketExists } from "@/lib/s3";
+import { s3, BUCKET } from "@/lib/s3";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -38,8 +38,6 @@ export async function POST(req: NextRequest) {
         if (!event) {
             return NextResponse.json({ err: "Event not found or unauthorized" }, { status: 404 });
         }
-
-        await ensureBucketExists();
 
         // Generate pre-signed URLs
         const folderName = `event/${event.code}`;

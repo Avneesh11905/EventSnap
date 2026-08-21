@@ -24,6 +24,8 @@ type Step = "encode" | "scan" | "loading" | "results";
 interface CapturedImage {
   blob: Blob;
   previewUrl: string;
+  width: number;
+  height: number;
 }
 
 interface MatchedPhoto {
@@ -47,14 +49,18 @@ export default function AttendeeSort() {
   const [step, setStep] = useState<Step>("encode");
   const [eventCode, setEventCode] = useState("");
   const [error, setError] = useState("");
+  const [multiFaceErrors, setMultiFaceErrors] = useState<{ image_index: number, bboxes: number[][], issue?: string }[]>([]);
 
   // Camera state
   const [currentAngle, setCurrentAngle] = useState(0);
   const [captures, setCaptures] = useState<(CapturedImage | null)[]>([null, null, null]);
   const [cameraActive, setCameraActive] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [encodeStep, setEncodeStep] = useState<"capture" | "review" | "encoding">("capture");
   const [encodeLoading, setEncodeLoading] = useState(false);
+
+  const allCaptured = captures.every((c) => c !== null);
 
   // Results state
   const [matchedPhotos, setMatchedPhotos] = useState<MatchedPhoto[]>([]);
@@ -90,6 +96,7 @@ export default function AttendeeSort() {
   // ─── Camera ───────────────────────────────────────
 
   const startCamera = useCallback(async () => {
+    setIsStartingCamera(true);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Camera API not available. Please ensure you are using HTTPS.");
@@ -118,6 +125,8 @@ export default function AttendeeSort() {
         ? "Camera permission denied."
         : `Camera error: ${err.name} - ${err.message || "Unknown error"}`;
       setError(msg);
+    } finally {
+      setIsStartingCamera(false);
     }
   }, []);
 
@@ -152,7 +161,12 @@ export default function AttendeeSort() {
             if (next[currentAngle]?.previewUrl) {
               URL.revokeObjectURL(next[currentAngle]!.previewUrl);
             }
-            next[currentAngle] = { blob, previewUrl };
+            next[currentAngle] = { 
+              blob, 
+              previewUrl, 
+              width: canvas.width, 
+              height: canvas.height 
+            };
             return next;
           });
           stopCamera();
@@ -176,24 +190,39 @@ export default function AttendeeSort() {
   }, [currentAngle, startCamera]);
 
   const proceedToNextAngle = useCallback(() => {
-    if (currentAngle < 2) {
-      setCurrentAngle(currentAngle + 1);
-      startCamera();
-    } else {
+    if (allCaptured) {
       setEncodeStep("review");
+    } else {
+      // Find the next missing photo starting from the current angle
+      const nextMissing = captures.findIndex((c, i) => c === null && i > currentAngle);
+      if (nextMissing !== -1) {
+        setCurrentAngle(nextMissing);
+        startCamera();
+      } else {
+        // Wrap around to find any missing photo
+        const anyMissing = captures.findIndex((c) => c === null);
+        if (anyMissing !== -1) {
+          setCurrentAngle(anyMissing);
+          startCamera();
+        } else {
+          setEncodeStep("review");
+        }
+      }
     }
-  }, [currentAngle, startCamera]);
+  }, [allCaptured, captures, currentAngle, startCamera]);
 
   const startCapture = useCallback(() => {
     setEncodeStep("capture");
     setCurrentAngle(0);
     setCaptures([null, null, null]);
+    setMultiFaceErrors([]);
     startCamera();
   }, [startCamera]);
 
   const retakeFromReview = useCallback((index: number) => {
     setCurrentAngle(index);
     setEncodeStep("capture");
+    setMultiFaceErrors((prev) => prev.filter(err => err.image_index !== index));
     setCaptures((prev) => {
       const next = [...prev];
       if (next[index]?.previewUrl) URL.revokeObjectURL(next[index]!.previewUrl);
@@ -222,6 +251,7 @@ export default function AttendeeSort() {
     setEncodeStep("encoding");
     setEncodeLoading(true);
     setError("");
+    setMultiFaceErrors([]);
 
     try {
       const images = await Promise.all(captures.map((c) => blobToBase64(c!.blob)));
@@ -232,8 +262,18 @@ export default function AttendeeSort() {
       // Refresh the session to pick up the new has_encoding flag
       await updateSession();
       setStep("scan");
-    } catch {
-      setError("Network error during encoding.");
+    } catch (err: any) {
+      const errorType = err.response?.data?.type;
+      if (
+        errorType === "MultipleFacesDetectedError" || 
+        errorType === "NoFacesDetectedError" || 
+        errorType === "FaceValidationError"
+      ) {
+        setError(""); // Clear global error, let multiFaceErrors handle the UI
+        setMultiFaceErrors(err.response.data.details || []);
+      } else {
+        setError(err.response?.data?.error || err.response?.data?.err || "Network error during encoding.");
+      }
       setEncodeStep("review");
     } finally {
       setEncodeLoading(false);
@@ -268,7 +308,6 @@ export default function AttendeeSort() {
 
   const angleConfig = ANGLE_CONFIG[currentAngle];
   const currentCapture = captures[currentAngle];
-  const allCaptured = captures.every((c) => c !== null);
 
   // ─── Loading State ────────────────────────────────
   if (sessionStatus === "loading") {
@@ -357,7 +396,7 @@ export default function AttendeeSort() {
               </div>
             )}
 
-            {!cameraActive && !currentCapture && (
+            {!cameraActive && !currentCapture && !isStartingCamera && captures.every(c => c === null) && (
               <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl p-8 text-center">
                 <div className="w-12 h-12 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto mb-4">
                   <Camera size={20} className="text-[var(--foreground-secondary)]" />
@@ -369,6 +408,13 @@ export default function AttendeeSort() {
                 <button onClick={startCapture} className="btn-primary flex items-center justify-center gap-2 mx-auto">
                   <Camera size={16} /> Start Face Scan
                 </button>
+              </div>
+            )}
+
+            {!cameraActive && !currentCapture && (isStartingCamera || captures.some(c => c !== null)) && (
+              <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl aspect-[4/5] flex flex-col items-center justify-center text-[var(--foreground-secondary)] ring-1 ring-zinc-800">
+                <Loader2 size={32} className="animate-spin mb-4" />
+                <p className="text-sm font-medium">Starting Camera...</p>
               </div>
             )}
 
@@ -423,7 +469,7 @@ export default function AttendeeSort() {
                     <RotateCcw size={16} /> Retake
                   </button>
                   <button onClick={proceedToNextAngle} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                    {currentAngle < 2 ? (<>Next <ChevronRight size={16} /></>) : (<>Review All</>)}
+                    {!allCaptured ? (<>Next <ChevronRight size={16} /></>) : (<>Review All</>)}
                   </button>
                 </div>
               </div>
@@ -435,31 +481,63 @@ export default function AttendeeSort() {
         {step === "encode" && encodeStep === "review" && (
           <div className="space-y-6">
             <div className="grid grid-cols-3 gap-3">
-              {ANGLE_CONFIG.map((angle, i) => (
-                <div key={angle.key} className="space-y-2">
-                  <div
-                    className="relative rounded-md overflow-hidden aspect-[3/4] ring-1 ring-zinc-800 bg-[var(--card-hover)] group cursor-pointer"
-                    onClick={() => retakeFromReview(i)}
-                  >
-                    {captures[i] ? (
-                      <>
-                        <Image src={captures[i]!.previewUrl} alt={angle.label} fill className="object-cover" />
-                        <div className="absolute inset-0 bg-[var(--background)]/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <div className="flex flex-col items-center gap-1 text-[var(--foreground-secondary)]">
-                            <RotateCcw size={16} />
-                            <span className="text-[10px] font-medium">Retake</span>
+              {ANGLE_CONFIG.map((angle, i) => {
+                const multiFaceError = multiFaceErrors.find((e) => e.image_index === i);
+                return (
+                  <div key={angle.key} className="space-y-2">
+                    <div
+                      className={`relative rounded-md overflow-hidden aspect-[3/4] ring-2 bg-[var(--card-hover)] group cursor-pointer ${
+                        multiFaceError ? "ring-red-500" : "ring-zinc-800"
+                      }`}
+                      onClick={() => retakeFromReview(i)}
+                    >
+                      {captures[i] ? (
+                        <>
+                          <Image src={captures[i]!.previewUrl} alt={angle.label} fill className="object-cover" />
+                          
+                          {multiFaceError && captures[i]!.width && captures[i]!.height && (
+                            <svg 
+                              viewBox={`0 0 ${captures[i]!.width} ${captures[i]!.height}`} 
+                              preserveAspectRatio="xMidYMid slice" 
+                              className="absolute inset-0 w-full h-full pointer-events-none"
+                            >
+                              {multiFaceError.bboxes.map((bbox, boxIdx) => (
+                                <rect 
+                                  key={boxIdx}
+                                  x={bbox[0]} 
+                                  y={bbox[1]} 
+                                  width={bbox[2] - bbox[0]} 
+                                  height={bbox[3] - bbox[1]} 
+                                  fill="none" 
+                                  stroke="#ef4444" 
+                                  strokeWidth={Math.max(4, captures[i]!.width * 0.01)}
+                                />
+                              ))}
+                            </svg>
+                          )}
+
+                          <div className="absolute inset-0 bg-[var(--background)]/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="flex flex-col items-center gap-1 text-[var(--foreground-secondary)]">
+                              <RotateCcw size={16} />
+                              <span className="text-[10px] font-medium">Retake</span>
+                            </div>
                           </div>
+                        </>
+                      ) : (
+                        <div className="w-full h-full bg-[var(--card-hover)] flex items-center justify-center">
+                          <X size={18} className="text-[var(--foreground-secondary)]" />
                         </div>
-                      </>
-                    ) : (
-                      <div className="w-full h-full bg-[var(--card-hover)] flex items-center justify-center">
-                        <X size={18} className="text-[var(--foreground-secondary)]" />
-                      </div>
+                      )}
+                    </div>
+                    <p className={`text-[11px] font-medium text-center uppercase tracking-wider ${multiFaceError ? "text-red-400" : "text-[var(--foreground-secondary)]"}`}>{angle.label}</p>
+                    {multiFaceError && (
+                      <p className="text-[10px] text-red-500 font-medium text-center leading-tight">
+                        {multiFaceError.issue === "none" ? "No face detected" : "Multiple faces"}
+                      </p>
                     )}
                   </div>
-                  <p className="text-[11px] font-medium text-[var(--foreground-secondary)] text-center uppercase tracking-wider">{angle.label}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {error && (

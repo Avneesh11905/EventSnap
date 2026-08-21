@@ -58,8 +58,32 @@ export async function POST(req: NextRequest) {
             encodingCount: 1,
             message: `Generated 1 averaged face encoding from 3 reference images`,
         });
-    } catch (err: unknown) {
+    } catch (err: any) {
         console.error("Encode error:", err);
+
+        if (err.response?.data) {
+            const data = err.response.data;
+            if (
+                data.type === "MultipleFacesDetectedError" ||
+                data.type === "NoFacesDetectedError" ||
+                data.type === "FaceValidationError"
+            ) {
+                return NextResponse.json({ 
+                    err: data.error,
+                    type: data.type,
+                    details: data.details 
+                }, { status: 400 });
+            }
+            return NextResponse.json(
+                { 
+                    err: data.error || data.detail || "Encoding failed",
+                    type: data.type,
+                    details: data.details
+                }, 
+                { status: err.response.status }
+            );
+        }
+
         const message = err instanceof Error ? err.message : "Encoding failed";
         return NextResponse.json({ err: message }, { status: 500 });
     }
