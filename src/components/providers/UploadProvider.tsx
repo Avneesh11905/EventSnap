@@ -34,48 +34,68 @@ interface UploadContextType extends UploadState {
 
 const resizeImage = (file: File, maxWidth = 1920, maxHeight = 1920): Promise<File> => {
     return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-            URL.revokeObjectURL(img.src);
-            let width = img.width;
-            let height = img.height;
+        const workerCode = `
+            self.onmessage = async (e) => {
+                const { file, maxWidth, maxHeight, id } = e.data;
+                try {
+                    const bitmap = await createImageBitmap(file);
+                    let width = bitmap.width;
+                    let height = bitmap.height;
 
-            if (width > maxWidth || height > maxHeight) {
-                if (width > height) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                } else {
-                    width = Math.round((width * maxHeight) / height);
-                    height = maxHeight;
-                }
-            }
+                    if (width > maxWidth || height > maxHeight) {
+                        if (width > height) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        } else {
+                            width = Math.round((width * maxHeight) / height);
+                            height = maxHeight;
+                        }
+                    }
 
-            const canvas = document.createElement("canvas");
-            canvas.width = width;
-            canvas.height = height;
+                    const canvas = new OffscreenCanvas(width, height);
+                    const ctx = canvas.getContext("2d");
+                    if (!ctx) throw new Error("OffscreenCanvas ctx not found");
 
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return reject("Canvas ctx not found");
-            ctx.drawImage(img, 0, 0, width, height);
+                    ctx.drawImage(bitmap, 0, 0, width, height);
 
-            canvas.toBlob(
-                (blob) => {
-                    if (!blob) return reject("Canvas is empty");
+                    const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.6 });
                     const resizedFile = new File([blob], file.name, {
                         type: "image/jpeg",
                         lastModified: Date.now(),
                     });
-                    resolve(resizedFile);
-                },
-                "image/jpeg",
-                0.6
-            );
+
+                    self.postMessage({ id, file: resizedFile });
+                } catch (error) {
+                    self.postMessage({ id, error: error.message || "Failed to resize" });
+                }
+            };
+        `;
+        
+        const blob = new Blob([workerCode], { type: "application/javascript" });
+        const workerUrl = URL.createObjectURL(blob);
+        const worker = new Worker(workerUrl);
+        
+        const id = Math.random().toString(36);
+        
+        worker.onmessage = (e) => {
+            if (e.data.id === id) {
+                if (e.data.error) {
+                    reject(new Error(e.data.error));
+                } else {
+                    resolve(e.data.file);
+                }
+                worker.terminate();
+                URL.revokeObjectURL(workerUrl);
+            }
         };
-        img.onerror = () => {
-            URL.revokeObjectURL(img.src);
-            reject("Image load error");
+        
+        worker.onerror = (err) => {
+            reject(err);
+            worker.terminate();
+            URL.revokeObjectURL(workerUrl);
         };
+        
+        worker.postMessage({ id, file, maxWidth, maxHeight });
     });
 };
 
@@ -277,9 +297,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
         const commitPendingSync = async () => {
             if (unsyncedCount <= 0) return;
+            const countToSync = unsyncedCount;
+            const mbToSync = unsyncedMB;
             try {
-                const countToSync = unsyncedCount;
-                const mbToSync = unsyncedMB;
                 unsyncedCount = 0;
                 unsyncedMB = 0;
 
@@ -289,6 +309,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 }, { signal: abortController.signal });
             } catch (err) {
                 console.error("Incremental DB sync failed", err);
+                // Restore counts so they are retried on the next batch
+                unsyncedCount += countToSync;
+                unsyncedMB += mbToSync;
             }
         };
 
@@ -366,6 +389,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
                 setProgress(adjustedPct);
                 setStatusMessage(`Uploading: ${adjustedPct}% (${successCount}/${files.length})`);
+                setImageCount(successCount);
             };
 
             // 2. Upload files in concurrent batches to S3
@@ -452,6 +476,13 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             setPhase("done");
             setStatusMessage(skippedCount > 0 ? `Complete! Uploaded ${newlyUploadedCount} new, skipped ${skippedCount} existing.` : `Upload Complete! Processed ${successCount} photos.`);
             localStorage.removeItem("eventsnap_live_s3_upload");
+
+            // Guarantee 100% consistency by reconciling S3 ground truth at the very end
+            try {
+                await apiClient.post(`/api/events/${event.id}/reconcile`);
+            } catch (e) {
+                console.error("Final reconcile failed", e);
+            }
 
         } catch (error: any) {
             // Ensure any partial progress from the current batch is committed before failing

@@ -113,6 +113,13 @@ export default function EventDetailsPage() {
         return () => clearInterval(interval);
     }, [isUploading, uploadingEventId, eventId, fetchEvent]);
 
+    // Fetch final state when upload finishes
+    useEffect(() => {
+        if (phase === "done" && uploadingEventId === eventId) {
+            fetchEvent();
+        }
+    }, [phase, uploadingEventId, eventId, fetchEvent]);
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             // Filter only true images matching our Python backend list

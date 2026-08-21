@@ -157,21 +157,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             return NextResponse.json({ err: "Not authorized" }, { status: 403 });
         }
 
-        const newPhotoCount = (event.photo_count || 0) + (photo_count || 0);
-        const newTotalSize = (event.total_size_mb || 0) + (total_size_mb || 0);
-
-        await prisma.event.update({
+        const updatedEvent = await prisma.event.update({
             where: { id },
             data: {
-                photo_count: newPhotoCount,
-                total_size_mb: newTotalSize
+                photo_count: { increment: photo_count || 0 },
+                total_size_mb: { increment: total_size_mb || 0 }
             },
         });
 
         return NextResponse.json({
             success: true,
-            photo_count: newPhotoCount,
-            total_size_mb: newTotalSize
+            photo_count: updatedEvent.photo_count,
+            total_size_mb: updatedEvent.total_size_mb
         });
     } catch (err: any) {
         return NextResponse.json({ err: err.message }, { status: 500 });
