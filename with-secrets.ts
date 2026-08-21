@@ -2,10 +2,10 @@ import { spawn } from "child_process";
 
 const INFISICAL_API_URL = process.env.INFISICAL_API_URL || "https://app.infisical.com";
 const INFISICAL_TOKEN = process.env.INFISICAL_TOKEN;
-const CLIENT_ID = process.env.INFISICAL_CLIENT_ID;
-const CLIENT_SECRET = process.env.INFISICAL_CLIENT_SECRET;
-const WORKSPACE_ID = process.env.INFISICAL_WORKSPACE_ID;
-const ENVIRONMENT = process.env.INFISICAL_ENVIRONMENT || "dev";
+const CLIENT_ID = process.env.INFISICAL_MACHINE_IDENTITY_CLIENT_ID;
+const CLIENT_SECRET = process.env.INFISICAL_MACHINE_IDENTITY_CLIENT_SECRET;
+const WORKSPACE_ID = process.env.INFISICAL_PROJECT_ID;
+const ENVIRONMENT = process.env.INFISICAL_ENVIRONMENT || "prod";
 
 const commandArgs = process.argv.slice(2);
 
@@ -52,7 +52,7 @@ async function run() {
       headers: { "Authorization": `Bearer ${accessToken}` },
     });
 
-    if (!secretsRes.ok) throw new Error(`Failed to fetch secrets`);
+    if (!secretsRes.ok) throw new Error(`Failed to fetch secrets: HTTP ${secretsRes.status}`);
     
     // Inject secrets DIRECTLY into memory!
     const data = await secretsRes.json();
