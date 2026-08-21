@@ -293,7 +293,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         };
 
         try {
-            // --- SMART RESUME: Check existing files in MinIO ---
+            // --- SMART RESUME: Check existing files in Storage ---
             setStatusMessage("Checking existing uploads...");
             const checkRes = await apiClient.post("/api/upload/check", {
                 eventId: event.id,

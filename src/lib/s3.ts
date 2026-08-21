@@ -1,7 +1,6 @@
 import {
     S3Client,
     HeadBucketCommand,
-    CreateBucketCommand,
 } from "@aws-sdk/client-s3";
 
 const endpoint = process.env.STORAGE_ENDPOINT!;
@@ -12,15 +11,15 @@ export const BUCKET = process.env.STORAGE_BUCKET_NAME!;
 
 export const s3 = new S3Client({
     endpoint,
-    region: "us-east-1", // MinIO doesn't care, but SDK requires it
+    region: "auto", // S3 API requires a region (auto works for most S3-compatible providers)
     credentials: {
         accessKeyId: accessKey,
         secretAccessKey: secretKey,
     },
-    forcePathStyle: true, // Required for MinIO
+    forcePathStyle: true, // Required for some S3-compatible storage APIs
 });
 
-/** Ensure the bucket exists in MinIO; create it if missing */
+/** Ensure the bucket exists in Storage; throw an error if missing */
 let bucketChecked = false;
 export async function ensureBucketExists() {
     if (bucketChecked) return;
@@ -33,16 +32,11 @@ export async function ensureBucketExists() {
             (err as { $metadata?: { httpStatusCode?: number } }).$metadata
                 ?.httpStatusCode;
         if (code === "NotFound" || code === 404 || code === "NoSuchBucket") {
-            console.log(`Bucket "${BUCKET}" not found — creating it...`);
-            await s3.send(new CreateBucketCommand({ Bucket: BUCKET }));
-            console.log(`Bucket "${BUCKET}" created successfully.`);
+            throw new Error(`Storage bucket "${BUCKET}" does not exist. Please create it manually with the correct policies/CORS settings.`);
         } else {
             throw err;
         }
     }
 
-    // CORS is omitted here because Google Cloud Storage (GCS) S3 interoperability 
-    // does not fully support PutBucketCorsCommand from the AWS SDK.
-    // Ensure you have set CORS on your GCS bucket using the Google Cloud Console or gsutil.
     bucketChecked = true;
 }

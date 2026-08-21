@@ -208,7 +208,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
             return NextResponse.json({ err: "Not authorized" }, { status: 403 });
         }
 
-        //  ML Backend Table & MinIO Cleanup (Async) 
+        //  ML Backend Table & Storage Cleanup (Async)
         try {
             const modelUrl = process.env.NEXT_PUBLIC_INFERENCE_API_URL || 'http://localhost:8000';
             // Backend celery task handles pgvector delete + S3 folder wipe

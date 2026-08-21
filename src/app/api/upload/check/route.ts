@@ -40,11 +40,11 @@ export async function POST(req: NextRequest) {
 
         await ensureBucketExists();
 
-        // Query MinIO for objects under this event's raw/ folder
+        // Query Storage for objects under this event's raw/ folder
         const prefix = `event/${event.code.endsWith('/') ? event.code : event.code + '/'}raw/`;
         // Store existing files as a Map of: originalBasename -> Set of sizes
         const existingFiles = new Map<string, Set<number>>();
-        let totalMinioSizeMB = 0;
+        let totalStorageSizeMB = 0;
 
         try {
             let isTruncated = true;
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
                                 existingFiles.get(originalBasename)!.add(item.Size || 0);
                                 
                                 if (item.Size) {
-                                    totalMinioSizeMB += item.Size / (1024 * 1024);
+                                    totalStorageSizeMB += item.Size / (1024 * 1024);
                                 }
                             }
                         }
@@ -100,14 +100,14 @@ export async function POST(req: NextRequest) {
         }
 
         // --- SELF-HEAL DATABASE ---
-        // We now have the exact ground truth of MinIO, so let's overwrite the DB to ensure perfect sync
+        // We now have the exact ground truth of Storage, so let's overwrite the DB to ensure perfect sync
         // in case previous uploads were interrupted.
         try {
             await prisma.event.update({
                 where: { id: eventId },
                 data: {
                     photo_count: trueTotalCount,
-                    total_size_mb: Number(totalMinioSizeMB.toFixed(2))
+                    total_size_mb: Number(totalStorageSizeMB.toFixed(2))
                 },
             });
         } catch (dbErr) {

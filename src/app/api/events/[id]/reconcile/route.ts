@@ -39,7 +39,7 @@ export async function POST(
             return NextResponse.json({ err: "Forbidden" }, { status: 403 });
         }
 
-        // 2. Scan MinIO for ground truth
+        // 2. Scan Storage for ground truth
         const prefix = `event/${event.code.endsWith('/') ? event.code : event.code + '/'}`;
         const rawPrefix = `${prefix}raw/`;
         

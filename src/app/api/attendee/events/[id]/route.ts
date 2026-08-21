@@ -123,7 +123,7 @@ export async function DELETE(
             return NextResponse.json({ err: "Event ID required" }, { status: 400 });
         }
 
-        // ─── MinIO Cleanup: Personal ZIP ───
+        // ─── Storage Cleanup: Personal ZIP ───
         try {
             const zipKey = `zip/${eventId}/${userId}.zip`;
             await s3.send(new DeleteObjectCommand({
