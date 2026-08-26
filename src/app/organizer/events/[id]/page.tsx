@@ -1,49 +1,209 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, use, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 import {
     ArrowLeft,
-    Users,
-    ImageIcon,
-    HardDrive,
-    Upload,
-    Loader2,
-    CheckCircle,
-    X,
     Cpu,
-    FolderUp
+    Loader2,
+    ImageOff,
+    CheckCircle2,
+    AlertCircle,
+    Upload,
+    Users,
+    Image as ImageIcon,
+    HardDrive,
+    Copy,
+    Check,
+    Pencil,
+    X
 } from "lucide-react";
+import { useInView } from "react-intersection-observer";
 import { apiClient } from "@/lib/axios";
-import Link from "next/link";
 import { useUpload } from "@/components/providers/UploadProvider";
+import { useGallery } from "@/hooks/useGallery";
+import { ImageLightbox } from "@/components/ImageLightbox";
+import { DatePicker } from "@/components/DatePicker";
 
 interface EventData {
     id: string;
     name: string;
     code: string;
+    description?: string;
+    date?: string;
     photo_count: number;
     total_size_mb: number;
     attendeesAccessed: any[];
 }
 
-export default function EventDetailsPage() {
+export default function EventDetailsPage({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}) {
     const { data: session } = useSession();
     const router = useRouter();
-    const params = useParams();
-    const eventId = params.id as string;
+    const { id: eventId } = use(params);
 
     const [event, setEvent] = useState<EventData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-
-    const [files, setFiles] = useState<File[]>([]);
-    const [dragActive, setDragActive] = useState(false);
     const [encodedCount, setEncodedCount] = useState<number | null>(null);
 
-    // Global Direct S3 Upload State
-    const { isUploading, phase, progress, encodeProgress, statusMessage, startUpload, startEncodingPoll, uploadingEventId, imageCount, cancelUpload } = useUpload();
+    // Global Upload State
+    const { phase, uploadingEventId, imageCount, queueUpload, startEncodingPoll } = useUpload();
+
+    // Gallery State
+    const {
+        images,
+        isLoading: isGalleryLoading,
+        isError: isGalleryError,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        refetch: refetchGallery,
+        selectedKeys,
+        toggleSelection,
+        selectAll,
+        clearSelection,
+        deleteSelected,
+        isDeleting,
+        deleteProgress,
+    } = useGallery(eventId);
+
+    const { ref, inView } = useInView();
+
+    const [filter, setFilter] = useState<"all" | "no_faces">("all");
+    const [copiedCode, setCopiedCode] = useState<string | null>(null);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editForm, setEditForm] = useState({ name: "", description: "", date: "" });
+    const [editSaving, setEditSaving] = useState(false);
+    const [stickyVisible, setStickyVisible] = useState(false);
+    const headerRef = useRef<HTMLDivElement>(null);
+
+    const copyCode = (code: string) => {
+        navigator.clipboard.writeText(code);
+        setCopiedCode(code);
+        setTimeout(() => setCopiedCode(null), 2000);
+    };
+
+    const openEditModal = () => {
+        if (!event) return;
+        const today = new Date().toISOString().split("T")[0];
+        setEditForm({
+            name: event.name || "",
+            description: event.description || "",
+            date: event.date ? new Date(event.date).toISOString().split("T")[0] : today,
+        });
+        setShowEditModal(true);
+    };
+
+    const handleEditEvent = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!event || !editForm.name.trim()) return;
+        setEditSaving(true);
+        try {
+            const res = await apiClient.put(`/api/events/${event.id}`, {
+                name: editForm.name.trim(),
+                description: editForm.description.trim() || undefined,
+                date: editForm.date || undefined,
+            });
+            if (res.data.success) {
+                setEvent(prev => prev ? {
+                    ...prev,
+                    name: editForm.name.trim(),
+                    description: editForm.description.trim(),
+                    date: editForm.date || undefined,
+                } : null);
+                setShowEditModal(false);
+            }
+        } catch {
+            // silently fail — user can retry
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    // Clear selection when changing tabs to prevent deleting hidden selected images
+    useEffect(() => {
+        clearSelection();
+    }, [filter, clearSelection]);
+
+    // Sticky bar — show when the header scrolls out of view
+    useEffect(() => {
+        const check = () => {
+            const el = headerRef.current;
+            if (!el) return;
+            setStickyVisible(el.getBoundingClientRect().bottom < 80);
+        };
+        window.addEventListener("scroll", check, { passive: true });
+        check(); // run once on mount
+        return () => window.removeEventListener("scroll", check);
+    }, []);
+
+    // Lightbox & Interaction State
+    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+    const pressTimer = useRef<NodeJS.Timeout | null>(null);
+    const isLongPress = useRef<boolean>(false);
+
+    const handlePointerDown = (e: React.PointerEvent, image: {key: string, url: string}) => {
+        // Only trigger on main mouse button or touch
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        
+        isLongPress.current = false;
+        
+        if (pressTimer.current) clearTimeout(pressTimer.current);
+        
+        pressTimer.current = setTimeout(() => {
+            isLongPress.current = true;
+            // Long Press Action
+            if (selectedKeys.size === 0) {
+                toggleSelection(image.key); // Select it
+            } else {
+                setLightboxImage(image.url); // Open lightbox
+            }
+            pressTimer.current = null;
+            // Reset after a brief delay so pointerUp sees it, then clear for next interaction
+            setTimeout(() => { isLongPress.current = false; }, 50);
+        }, 500); // 500ms for long press
+    };
+
+    const handlePointerUp = (e: React.PointerEvent, image: {key: string, url: string}) => {
+        if (pressTimer.current) {
+            clearTimeout(pressTimer.current);
+            pressTimer.current = null;
+        }
+        
+        if (!isLongPress.current) {
+            // Click Action
+            if (e.metaKey || e.ctrlKey || e.shiftKey) {
+                toggleSelection(image.key);
+                return;
+            }
+            if (selectedKeys.size === 0) {
+                setLightboxImage(image.url); // Open lightbox
+            } else {
+                toggleSelection(image.key); // Toggle selection
+            }
+        }
+    };
+
+    const handlePointerLeave = () => {
+        if (pressTimer.current) {
+            clearTimeout(pressTimer.current);
+            pressTimer.current = null;
+        }
+        isLongPress.current = false;
+    };
+
+    useEffect(() => {
+        if (inView && hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+        }
+    }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     const fetchEvent = useCallback(async () => {
         try {
@@ -51,13 +211,11 @@ export default function EventDetailsPage() {
             const data = res.data;
             if (data.success) {
                 setEvent(data.event);
-
-                // Also fetch encoding count in the same load cycle
                 try {
                     const countRes = await apiClient.get(`/api/encode/count?eventId=${data.event.id}`);
                     const countData = countRes.data;
                     if (countData.success) setEncodedCount(countData.encoded_count);
-                } catch { /* encoding count is optional */ }
+                } catch { }
             } else {
                 setError(data.err || "Failed to load event");
             }
@@ -80,22 +238,17 @@ export default function EventDetailsPage() {
                     total_size_mb: data.total_size_mb
                 } : null);
             }
-        } catch (err) {
-            console.error("Auto-reconciliation failed", err);
-        }
+        } catch (err) { }
     }, [eventId]);
 
-    // Re-fetch encoding count when encoding phase changes
     useEffect(() => {
-        const isActiveUpload = uploadingEventId === event?.id && phase === "uploading";
-        if (!event?.id || isActiveUpload) return;
-        if (phase === "done") {
-            apiClient.get(`/api/encode/count?eventId=${event.id}`)
+        if (phase === "done" && uploadingEventId === eventId) {
+            apiClient.get(`/api/encode/count?eventId=${eventId}`)
                 .then(res => res.data)
                 .then(data => { if (data.success) setEncodedCount(data.encoded_count); })
                 .catch(() => { });
         }
-    }, [event?.id, phase]);
+    }, [eventId, phase, uploadingEventId]);
 
     useEffect(() => {
         if (session) {
@@ -104,72 +257,158 @@ export default function EventDetailsPage() {
         }
     }, [session, fetchEvent, reconcileStorage]);
 
-    // Poll Database every 10s while uploading to this event so stats update live
-    useEffect(() => {
-        if (!isUploading || uploadingEventId !== eventId) return;
-        const interval = setInterval(() => {
-            fetchEvent();
-        }, 2000);
-        return () => clearInterval(interval);
-    }, [isUploading, uploadingEventId, eventId, fetchEvent]);
-
-    // Fetch final state when upload finishes
-    useEffect(() => {
-        if (phase === "done" && uploadingEventId === eventId) {
-            fetchEvent();
-        }
-    }, [phase, uploadingEventId, eventId, fetchEvent]);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            // Filter only true images matching our Python backend list
-            const validFiles = Array.from(e.target.files).filter(f =>
-                !f.name.startsWith("._") && !f.name.startsWith("__MACOSX") &&
-                (f.type.startsWith("image/") || f.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))
-            );
-            setFiles(prev => [...prev, ...validFiles]);
-        }
-    };
-
-    const handleDrag = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else {
-            setDragActive(false);
-        }
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            const validFiles = Array.from(e.dataTransfer.files).filter(f =>
-                !f.name.startsWith("._") && !f.name.startsWith("__MACOSX") &&
-                (f.type.startsWith("image/") || f.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))
-            );
-            setFiles(prev => [...prev, ...validFiles]);
-        }
-    };
-
-    // startS3Upload has been moved to UploadProvider so it persists globally
-
     const triggerBackendEncoding = async () => {
         if (!event) return;
+        if (phase !== "idle" && phase !== "done" && phase !== "error") {
+            alert("An upload or encoding process is already running. Please wait for it to finish or cancel it before starting a new one.");
+            return;
+        }
         try {
             const res = await apiClient.post("/api/encode", { eventId: event.id });
             const data = res.data;
 
             if (data.success && data.task_id) {
-                // Start tracking the Celery task in the global upload widget
                 startEncodingPoll(data.task_id, event.id);
             } else {
                 setError(data.err || "Failed to trigger encoding.");
             }
         } catch (e: any) {
             setError(e.message || "Failed to contact encoding server.");
+        }
+    };
+
+    useEffect(() => {
+        if (phase === "done" && uploadingEventId === eventId) {
+            fetchEvent();
+            refetchGallery();
+        }
+    }, [phase, uploadingEventId, eventId, fetchEvent, refetchGallery]);
+
+    const filteredImages = images.filter(img => filter === "all" || img.status === filter);
+
+    const [wantsSelectAll, setWantsSelectAll] = useState(false);
+    const fetchCountRef = useRef(0);
+
+    const getKeysToSelect = () => {
+        return filter === "all"
+            ? filteredImages.filter(img => img.status !== "no_faces").map((img) => img.key)
+            : filteredImages.map((img) => img.key);
+    };
+
+    const handleSelectAll = () => {
+        if (!hasNextPage) {
+            selectAll(getKeysToSelect());
+        } else {
+            fetchCountRef.current = 0;
+            setWantsSelectAll(true);
+        }
+    };
+
+    useEffect(() => {
+        if (wantsSelectAll) {
+            if (isGalleryError) {
+                setWantsSelectAll(false);
+                return;
+            }
+            if (hasNextPage && !isFetchingNextPage) {
+                // Safeguard: Cap auto-fetching to 10 pages (max ~500 images) per click
+                // to prevent browser crashes on massive events.
+                if (fetchCountRef.current >= 10) {
+                    selectAll(getKeysToSelect());
+                    setWantsSelectAll(false);
+                } else {
+                    fetchCountRef.current += 1;
+                    fetchNextPage();
+                }
+            } else if (!hasNextPage && !isFetchingNextPage) {
+                selectAll(getKeysToSelect());
+                setWantsSelectAll(false);
+            }
+        }
+    }, [wantsSelectAll, hasNextPage, isFetchingNextPage, fetchNextPage, filteredImages, selectAll, isGalleryError]);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0 && event) {
+            const validFiles = Array.from(e.target.files).filter(f =>
+                !f.name.startsWith("._") && !f.name.startsWith("__MACOSX") &&
+                (f.type.startsWith("image/") || f.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))
+            );
+            if (validFiles.length > 0) {
+                queueUpload(validFiles, event);
+            }
+        }
+        // Reset input so the same files can be selected again if needed
+        e.target.value = '';
+    };
+
+    // Removed filteredImages from here
+    useEffect(() => {
+        if (filter !== "all" && filteredImages.length < 10 && hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+        }
+    }, [filter, filteredImages.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        if (!event) return;
+
+        const files: File[] = [];
+        
+        // Helper to recursively get files from a directory entry
+        const getFilesFromEntry = async (entry: any): Promise<void> => {
+            if (entry.isFile) {
+                return new Promise((resolve) => {
+                    entry.file((file: File) => {
+                        if (!file.name.startsWith("._") && !file.name.startsWith("__MACOSX") && (file.type.startsWith("image/") || file.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))) {
+                            files.push(file);
+                        }
+                        resolve();
+                    });
+                });
+            } else if (entry.isDirectory) {
+                const dirReader = entry.createReader();
+                const entries = await new Promise<any[]>((resolve) => {
+                    dirReader.readEntries(resolve);
+                });
+                for (const childEntry of entries) {
+                    await getFilesFromEntry(childEntry);
+                }
+            }
+        };
+
+        const items = Array.from(e.dataTransfer.items);
+        for (const item of items) {
+            const entry = item.webkitGetAsEntry?.();
+            if (entry) {
+                await getFilesFromEntry(entry);
+            } else if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file && !file.name.startsWith("._") && !file.name.startsWith("__MACOSX") && (file.type.startsWith("image/") || file.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))) {
+                    files.push(file);
+                }
+            }
+        }
+
+        if (files.length > 0) {
+            queueUpload(files, event);
         }
     };
 
@@ -185,7 +424,7 @@ export default function EventDetailsPage() {
         return (
             <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-5 bg-[var(--background)]">
                 <div className="max-w-sm w-full rounded-xl bg-[var(--card-hover)] border border-[var(--border)] p-8 text-center">
-                    <p className="text-red-400 mb-6">{typeof error === 'string' ? error : JSON.stringify(error)}</p>
+                    <p className="text-red-400 mb-6">{error}</p>
                     <Link href="/organizer/dashboard" className="btn-primary inline-flex">Go Back</Link>
                 </div>
             </div>
@@ -197,231 +436,467 @@ export default function EventDetailsPage() {
         : (event?.photo_count || 0);
 
     return (
-        <div className="min-h-[calc(100vh-4rem)] lg:h-[calc(100vh-4rem)] bg-[var(--background)] relative pt-12 pb-6">
-            <div className="relative max-w-5xl mx-auto px-6 h-full flex flex-col">
-                {/* Back link */}
+        <>
+        <div 
+            className="min-h-[calc(100vh-4rem)] bg-[var(--background)] relative"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {isDragging && (
+                <div className="absolute inset-0 z-[100] bg-blue-500/10 backdrop-blur-sm border-2 border-dashed border-blue-500 rounded-xl flex items-center justify-center pointer-events-none m-4">
+                    <div className="bg-[var(--card-hover)] text-[var(--foreground)] px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center">
+                        <Upload size={48} className="text-blue-500 mb-4" />
+                        <h2 className="text-2xl font-bold mb-2">Drop Folder or Files Here</h2>
+                        <p className="text-[var(--foreground-secondary)]">Drop to instantly add them to the queue</p>
+                    </div>
+                </div>
+            )}
+            {/* Sticky condensed toolbar */}
+            <div className={`fixed top-0 left-0 right-0 h-16 z-[70] transition-all duration-200 bg-[var(--background)] border-b border-[var(--border)] flex items-center ${stickyVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"}`}>
+                <div className="w-full mx-auto max-w-[1400px] px-6">
+                    <div className="flex items-center gap-4">
+                        {/* Event name + code */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <Link href="/organizer/dashboard" className="p-1.5 -ml-1.5 rounded-md hover:bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors">
+                                <ArrowLeft size={16} />
+                            </Link>
+                            <span className="text-[14px] font-semibold text-[var(--foreground)] truncate">{event?.name}</span>
+                            <button
+                                onClick={() => event && copyCode(event.code)}
+                                className="shrink-0 flex items-center gap-1 font-mono text-[11px] font-semibold bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20 hover:bg-sky-500/20 transition-colors tracking-wider"
+                            >
+                                {event?.code}
+                                {copiedCode === event?.code ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} className="opacity-60" />}
+                            </button>
+                        </div>
+
+                        {/* Tab switcher */}
+                        <div className="flex items-center bg-[var(--card-hover)] p-0.5 rounded-lg border border-[var(--border)] shrink-0">
+                            <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => setFilter("all")}
+                                className={`text-[12px] font-medium px-3 py-1 rounded-md transition-all ${filter === "all" ? "bg-[var(--foreground)] text-[var(--background)] shadow-sm" : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"}`}>
+                                All Photos
+                            </button>
+                            <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => setFilter("no_faces")}
+                                className={`text-[12px] font-medium px-3 py-1 rounded-md transition-all ${filter === "no_faces" ? "bg-amber-400 text-amber-950 shadow-sm" : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"}`}>
+                                No-Face
+                            </button>
+                        </div>
+
+                        {/* Select all / Clear */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <button type="button" onPointerDown={e => e.stopPropagation()} onClick={handleSelectAll} disabled={wantsSelectAll}
+                                className="text-[12px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-all flex items-center gap-1 disabled:opacity-40">
+                                {wantsSelectAll ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                                Select All
+                            </button>
+                            <button type="button" onPointerDown={e => e.stopPropagation()} onClick={clearSelection} disabled={selectedKeys.size === 0}
+                                className="text-[12px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-all disabled:opacity-40">
+                                Clear
+                            </button>
+                        </div>
+
+                        {/* Upload button */}
+                        <button
+                            onClick={async () => {
+                                if ('showDirectoryPicker' in window) {
+                                    try {
+                                        // @ts-ignore
+                                        const dirHandle = await window.showDirectoryPicker();
+                                        const files: File[] = [];
+                                        const getFiles = async (dh: any) => {
+                                            for await (const entry of dh.values()) {
+                                                if (entry.kind === 'file') {
+                                                    const file = await entry.getFile();
+                                                    if (!file.name.startsWith("._") && (file.type.startsWith("image/") || file.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))) files.push(file);
+                                                } else if (entry.kind === 'directory') await getFiles(entry);
+                                            }
+                                        };
+                                        await getFiles(dirHandle);
+                                        if (files.length > 0 && event) queueUpload(files, event);
+                                    } catch (err: any) {
+                                        if (err.name !== 'AbortError') document.getElementById("upload-input")?.click();
+                                    }
+                                } else {
+                                    document.getElementById("upload-input")?.click();
+                                }
+                            }}
+                            disabled={phase === "uploading" || phase === "extracting"}
+                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1.5 transition-all ${(phase === "uploading" || phase === "extracting") ? "bg-[var(--card-hover)] text-[var(--foreground-secondary)] opacity-50 cursor-not-allowed border border-[var(--border)]" : "bg-sky-500 hover:bg-sky-400 text-white"}`}
+                        >
+                            <Upload size={13} /> Upload
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="container mx-auto px-6 py-8 relative">
                 <Link
                     href="/organizer/dashboard"
-                    className="inline-flex items-center gap-1.5 text-[13px] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] mb-6 transition-colors w-fit font-medium"
+                    className="inline-flex items-center gap-1.5 text-[13px] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] mb-5 transition-colors w-fit font-medium"
                 >
                     <ArrowLeft size={14} /> Back to Dashboard
                 </Link>
 
-                {error && (
-                    <div className="bg-red-950 border border-red-900 rounded-md px-4 py-3 mb-4 text-red-400 text-sm flex items-center justify-between">
-                        <span className="truncate mr-2">{typeof error === 'string' ? error : JSON.stringify(error)}</span>
-                        <button onClick={() => setError("")} className="hover:text-red-300 transition shrink-0"><X size={14} /></button>
-                    </div>
-                )}
-
-                {/* Header: Event info + Stats */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                {/* Header: Event info + Actions */}
+                <div ref={headerRef} className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6">
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1">
-                            <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)] truncate">{event?.name}</h1>
-                            <span className="shrink-0 font-mono text-[12px] font-medium bg-[var(--card-hover)] text-[var(--foreground-secondary)] px-2 py-1 rounded-md border border-[var(--border)] select-all tracking-wider" title="Click to copy event code">
-                                {event?.code}
-                            </span>
-                        </div>
-                        <p className="text-[14px] text-[var(--foreground-secondary)] truncate">Upload pipeline & face recognition</p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        {/* Stat pills */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {[
-                                { label: "Photos", value: photoCount.toLocaleString() },
-                                { label: "Encoded", value: typeof encodedCount === 'number' ? encodedCount.toLocaleString() : "..." },
-                                { label: "Attendees", value: event?.attendeesAccessed?.length || 0 },
-                                { label: "Storage", value: `${(event?.total_size_mb || 0).toFixed(1)} MB` }
-                            ].map((stat, i) => (
-                                <div key={i} className="glass-card rounded-md px-4 py-2 text-center min-w-[80px]">
-                                    <p className="text-[11px] uppercase tracking-wider text-[var(--foreground-secondary)] mb-0.5 font-medium">{stat.label}</p>
-                                    <p className="text-[15px] font-semibold tabular-nums text-[var(--foreground)]">{stat.value}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Pipeline Cards */}
-                <div className="grid md:grid-cols-2 gap-6 flex-1 min-h-0 pb-12">
-
-                    {/* ── Card 1: Upload ── */}
-                    <div className="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden group">
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className="w-6 h-6 rounded-md bg-[var(--border)] flex items-center justify-center text-[11px] font-bold text-[var(--foreground-secondary)]">1</div>
-                            <h2 className="text-[16px] font-semibold tracking-tight text-[var(--foreground)]">Upload Photos</h2>
-                        </div>
-                        <p className="text-[13px] text-[var(--foreground-secondary)] mb-5 ml-9">Drop photos from your hard drive to cloud storage</p>
-
-                        {/* Dropzone */}
-                        <div
-                            onDragEnter={handleDrag}
-                            onDragOver={handleDrag}
-                            onDragLeave={handleDrag}
-                            onDrop={handleDrop}
-                            className={`flex-1 rounded-md flex flex-col items-center justify-center text-center transition-all duration-300 border border-dashed ${(phase === "uploading" && uploadingEventId === event?.id) ? "border-sky-500 bg-sky-950/20"
-                                : (phase === "encoding" && uploadingEventId === event?.id) ? "opacity-40 border-[var(--border)] bg-[var(--card-hover)]/50"
-                                    : dragActive ? "border-sky-500 bg-[var(--card-hover)] scale-[1.01]"
-                                        : files.length ? "border-sky-500 bg-[var(--card-hover)] cursor-pointer"
-                                            : "border-[var(--border)] bg-[var(--card-hover)]/50 hover:border-zinc-500 hover:bg-[var(--card-hover)] cursor-pointer"
-                                }`}
-                            onClick={() => phase !== "uploading" && phase !== "encoding" && document.getElementById("folderInput")?.click()}
-                        >
-                            <input
-                                id="folderInput"
-                                type="file"
-                                multiple
-                                accept="image/jpeg, image/png, image/webp"
-                                // @ts-ignore
-                                webkitdirectory="true"
-                                directory="true"
-                                className="hidden"
-                                onChange={handleFileChange}
-                            />
-
-                            {phase === "uploading" && uploadingEventId === event?.id ? (
-                                <div className="w-full px-6 space-y-5">
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-xl font-bold tabular-nums text-[var(--foreground)]">{progress}</span>
-                                            <span className="text-[11px] font-bold text-[var(--foreground-secondary)] uppercase tracking-widest">%</span>
-                                        </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); cancelUpload(); }}
-                                            className="px-2 py-1 rounded-md bg-red-950 hover:bg-red-900 text-red-400 text-[10px] font-medium uppercase tracking-wider transition-colors border border-red-900"
-                                        >
-                                            Cancel Upload
-                                        </button>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-sky-500 rounded-full transition-all duration-500 ease-out"
-                                                style={{ width: `${progress}%` }}
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-center gap-1.5">
-                                            <span className="relative flex h-1.5 w-1.5">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-500"></span>
-                                            </span>
-                                        <p className="text-[11px] text-[var(--foreground-secondary)] font-medium tracking-tight truncate max-w-[200px]">
-                                                {statusMessage}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : !files.length ? (
-                                <div className="space-y-2 text-center">
-                                    <div className="w-10 h-10 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto mb-2">
-                                        <FolderUp size={18} className="text-[var(--foreground-secondary)]" />
-                                    </div>
-                                    <p className="text-[13px] font-medium text-[var(--foreground-secondary)]">
-                                        {dragActive ? "Drop here" : "Select folder"}
-                                    </p>
-                                    <p className="text-[11px] text-[var(--foreground-secondary)]">or drag & drop images • JPG, PNG, WebP</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2 text-center">
-                                    <div className="w-10 h-10 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto mb-2">
-                                        <ImageIcon size={18} className="text-[var(--foreground-secondary)]" />
-                                    </div>
-                                    <p className="text-[13px] font-medium text-[var(--foreground)]">{files.length.toLocaleString()} images queued</p>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setFiles([]); }}
-                                        className="text-[11px] text-[var(--foreground-secondary)] hover:text-red-400 transition"
-                                    >
-                                        Clear
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {files.length > 0 && phase !== "uploading" && phase !== "encoding" && (
-                            <button
-                                onClick={() => startUpload(files, event!)}
-                                className="mt-4 w-full btn-premium py-2.5 justify-center"
+                        <div className="flex items-center gap-3 mb-1.5">
+                            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)] truncate">{event?.name}</h1>
+                            <button 
+                                onClick={() => event && copyCode(event.code)}
+                                className="shrink-0 flex items-center gap-1.5 font-mono text-[12px] font-semibold bg-sky-500/10 text-sky-400 px-2.5 py-1 rounded-md border border-sky-500/20 hover:bg-sky-500/20 transition-colors tracking-wider" 
+                                title="Click to copy event code"
                             >
-                                <Upload size={14} className="text-[var(--foreground)]/60" />
-                                <span>Start Upload</span>
+                                {event?.code}
+                                {copiedCode === event?.code ? (
+                                    <Check size={12} className="text-emerald-500" />
+                                ) : (
+                                    <Copy size={12} className="opacity-70" />
+                                )}
+                            </button>
+                            <button
+                                onClick={openEditModal}
+                                className="shrink-0 p-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] border border-transparent hover:border-[var(--border)] transition-colors"
+                                title="Edit event details"
+                            >
+                                <Pencil size={16} />
+                            </button>
+                        </div>
+                        <p className="text-[15px] text-[var(--foreground-secondary)]">
+                            {event?.description || "No description."}
+                            {event?.date && (
+                                <span className="ml-2 text-[13px] opacity-70">· {new Date(event.date).toLocaleDateString()}</span>
+                            )}
+                        </p>
+                        
+                        {/* Inline Metrics Row */}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-[13px]">
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <ImageIcon size={15} />
+                                <span className="font-medium text-[var(--foreground)]">{photoCount.toLocaleString()}</span> Photos
+                            </div>
+                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <Cpu size={15} />
+                                <span className="font-medium text-[var(--foreground)]">{typeof encodedCount === 'number' ? encodedCount.toLocaleString() : "..."}</span> Encoded
+                            </div>
+                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <Users size={15} />
+                                <span className="font-medium text-[var(--foreground)]">{event?.attendeesAccessed?.length || 0}</span> Attendees
+                            </div>
+                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <HardDrive size={15} />
+                                <span className="font-medium text-[var(--foreground)]">{(event?.total_size_mb || 0).toFixed(1)} MB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                        <input
+                            id="upload-input"
+                            type="file"
+                            multiple
+                            accept="image/jpeg, image/png, image/webp"
+                            className="hidden"
+                            onChange={handleFileChange}
+                        />
+                        <button 
+                            onClick={async () => {
+                                if ('showDirectoryPicker' in window) {
+                                    try {
+                                        // @ts-ignore
+                                        const dirHandle = await window.showDirectoryPicker();
+                                        const files: File[] = [];
+                                        const getFiles = async (dirHandle: any) => {
+                                            for await (const entry of dirHandle.values()) {
+                                                if (entry.kind === 'file') {
+                                                    const file = await entry.getFile();
+                                                    if (!file.name.startsWith("._") && !file.name.startsWith("__MACOSX") && (file.type.startsWith("image/") || file.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))) {
+                                                        files.push(file);
+                                                    }
+                                                } else if (entry.kind === 'directory') {
+                                                    await getFiles(entry);
+                                                }
+                                            }
+                                        };
+                                        await getFiles(dirHandle);
+                                        if (files.length > 0 && event) {
+                                            queueUpload(files, event);
+                                        }
+                                    } catch (err: any) {
+                                        if (err.name !== 'AbortError') {
+                                            console.error(err);
+                                            document.getElementById("upload-input")?.click();
+                                        }
+                                    }
+                                } else {
+                                    document.getElementById("upload-input")?.click();
+                                }
+                            }} 
+                            className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-sm ${
+                                (phase === "uploading" || phase === "extracting") 
+                                ? "bg-[var(--card-hover)] text-[var(--foreground-secondary)] opacity-50 cursor-not-allowed border border-[var(--border)]" 
+                                : "bg-sky-500 hover:bg-sky-400 text-white hover:shadow-sky-500/20 hover:shadow-lg"
+                            }`}
+                            disabled={phase === "uploading" || phase === "extracting"}
+                        >
+                            <Upload size={16} className={(phase === "uploading" || phase === "extracting") ? "" : "text-sky-100"} /> Upload Photos
+                        </button>
+
+                        {(event?.photo_count || 0) > 0 && typeof encodedCount === 'number' && encodedCount < (event?.photo_count || 0) && (phase === "idle" || phase === "done" || phase === "error") && (
+                            <button
+                                onClick={triggerBackendEncoding}
+                                className="px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-sm bg-[var(--card-hover)] hover:bg-[var(--border)] text-[var(--foreground)] border border-[var(--border)]"
+                            >
+                                <Cpu size={16} className="text-sky-400" /> Start Recognition
                             </button>
                         )}
                     </div>
+                </div>
 
-                    {/* ── Card 2: AI Encoding ── */}
-                    <div className="glass-card rounded-xl p-6 flex flex-col relative overflow-hidden">
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className="w-6 h-6 rounded-md bg-[var(--border)] flex items-center justify-center text-[11px] font-bold text-[var(--foreground-secondary)]">2</div>
-                            <h2 className="text-[16px] font-semibold tracking-tight text-[var(--foreground)]">AI Face Recognition</h2>
-                        </div>
-                        <p className="text-[13px] text-[var(--foreground-secondary)] mb-5 ml-9">Analyze uploaded photos with GPU-powered face detection</p>
-
-                        <div className="flex-1 rounded-md bg-[var(--card-hover)] border border-[var(--border)] flex flex-col items-center justify-center p-6">
-                            {phase === "encoding" && uploadingEventId === event?.id ? (
-                                <div className="w-full space-y-4">
-                                    <div className="w-12 h-12 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto relative">
-                                        <Cpu size={20} className="text-[var(--foreground-secondary)] animate-pulse" />
-                                        <div className="absolute inset-0 rounded-md border border-dashed border-sky-500/50 animate-[spin_3s_linear_infinite]" />
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-[13px] font-medium text-[var(--foreground)]">Processing</p>
-                                        <p className="text-[11px] text-[var(--foreground-secondary)] mt-0.5">{statusMessage}</p>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <div className="flex justify-between text-[11px]">
-                                            <span className="text-[var(--foreground-secondary)]">Encoding</span>
-                                            <span className="text-[var(--foreground-secondary)] tabular-nums">{encodeProgress}%</span>
-                                        </div>
-                                        <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
-                                            <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${encodeProgress}%` }} />
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (event?.photo_count || 0) === 0 || (uploadingEventId === event?.id && phase === "uploading") ? (
-                                <div className="text-center space-y-2">
-                                    <div className="w-10 h-10 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto">
-                                        <Cpu size={18} className="text-[var(--foreground-secondary)]" />
-                                    </div>
-                                    <p className="text-[13px] text-[var(--foreground-secondary)]">
-                                        {uploadingEventId === event?.id && phase === "uploading" ? "Upload in progress..." : "Upload photos first"}
-                                    </p>
-                                </div>
-                            ) : typeof encodedCount === 'number' && encodedCount >= (event?.photo_count || 0) && (event?.photo_count || 0) > 0 ? (
-                                <div className="text-center space-y-2">
-                                    <div className="w-10 h-10 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto">
-                                        <CheckCircle size={18} className="text-emerald-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[13px] font-medium text-[var(--foreground)]">All {encodedCount.toLocaleString()} images encoded</p>
-                                        <p className="text-[11px] text-[var(--foreground-secondary)] mt-0.5">Face recognition ready</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-center w-full space-y-4">
-                                    <div className="w-10 h-10 rounded-md bg-[var(--border)] flex items-center justify-center mx-auto relative">
-                                        <Cpu size={18} className="text-[var(--foreground-secondary)]" />
-                                    </div>
-                                    {typeof encodedCount === 'number' && encodedCount > 0 && (
-                                        <p className="text-[11px] text-[var(--foreground-secondary)]">{encodedCount}/{event?.photo_count || 0} encoded</p>
-                                    )}
-                                    <button
-                                        onClick={triggerBackendEncoding}
-                                        className="w-full btn-premium justify-center"
-                                    >
-                                        <Cpu size={14} className="text-[var(--foreground-secondary)]" />
-                                        <span>Start Recognition</span>
-                                    </button>
-                                    <p className="text-[10px] text-[var(--foreground-secondary)]">~1 min per 500 photos</p>
-                                </div>
-                            )}
-                        </div>
+                {/* Gallery Toolbar — hidden when sticky bar takes over */}
+                <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mt-4 border-b border-[var(--border)] transition-all duration-200 ${stickyVisible ? "opacity-0 pointer-events-none h-0 overflow-hidden pb-0 mt-0 border-none" : "opacity-100"}`}>
+                    
+                    {/* Segmented Control */}
+                    <div className="flex items-center bg-[var(--card-hover)] p-1 rounded-lg border border-[var(--border)]">
+                        <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => setFilter("all")}
+                            className={`text-sm font-medium px-4 py-1.5 rounded-md transition-all duration-200 ${
+                                filter === "all"
+                                    ? "bg-[var(--foreground)] text-[var(--background)] shadow-sm"
+                                    : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
+                            }`}
+                        >
+                            All Photos
+                        </button>
+                        <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => setFilter("no_faces")}
+                            className={`text-sm font-medium px-4 py-1.5 rounded-md transition-all duration-200 ${
+                                filter === "no_faces"
+                                    ? "bg-amber-400 text-amber-950 shadow-sm"
+                                    : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
+                            }`}
+                        >
+                            No-Face Photos
+                        </button>
                     </div>
 
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="text-[13px] font-medium px-3 py-1.5 rounded-md border border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={handleSelectAll}
+                            disabled={wantsSelectAll}
+                        >
+                            {wantsSelectAll ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                            {wantsSelectAll ? "Loading..." : "Select All"}
+                        </button>
+                        <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="text-[13px] font-medium px-3 py-1.5 rounded-md border border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={clearSelection}
+                            disabled={selectedKeys.size === 0}
+                        >
+                            Clear
+                        </button>
+                    </div>
                 </div>
+
+                {/* Gallery Grid */}
+                {isGalleryError ? (
+                    <div className="flex h-64 items-center justify-center text-red-500">
+                        Failed to load gallery.
+                    </div>
+                ) : filteredImages.length === 0 && !isGalleryLoading ? (
+                    <div className="flex flex-col items-center justify-center py-32 rounded-xl border border-dashed border-[var(--border)] bg-[var(--card-hover)]/30 mt-8">
+                        <div className="w-16 h-16 rounded-2xl bg-[var(--card-hover)] border border-[var(--border)] flex items-center justify-center mb-4">
+                            <ImageOff className="h-8 w-8 text-[var(--foreground-secondary)]" />
+                        </div>
+                        <p className="text-lg font-medium text-[var(--foreground)]">No images found</p>
+                        <p className="text-sm text-[var(--foreground-secondary)] mt-1">Images uploaded to this event will appear here.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 gap-3 pb-32 pt-6 px-1 md:px-2">
+                        {filteredImages.map((image) => (
+                            <div
+                                key={image.key}
+                                onPointerDown={(e) => handlePointerDown(e, image)}
+                                onPointerUp={(e) => handlePointerUp(e, image)}
+                                onPointerCancel={handlePointerLeave}
+                                onPointerLeave={handlePointerLeave}
+                                onContextMenu={(e) => e.preventDefault()}
+                                className={`group relative aspect-square rounded-xl overflow-hidden cursor-pointer transition-all duration-200 select-none touch-callout-none touch-action-none ${
+                                    selectedKeys.has(image.key)
+                                        ? "ring-2 ring-sky-500 ring-offset-2 ring-offset-[var(--background)] scale-[0.96] shadow-xl"
+                                        : "hover:ring-1 hover:ring-[var(--border)]"
+                                }`}
+                                style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
+                            >
+                                <Image
+                                    src={image.url}
+                                    alt="Gallery thumbnail"
+                                    fill
+                                    unoptimized
+                                    className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                                />
+
+                                {/* Dark Gradient Overlay for contrast */}
+                                <div className={`absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent transition-opacity duration-300 pointer-events-none ${selectedKeys.has(image.key) ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}></div>
+
+                                {/* Checkbox Overlay */}
+                                <div
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        toggleSelection(image.key);
+                                    }}
+                                    onPointerUp={(e) => e.stopPropagation()}
+                                    className={`absolute top-3 left-3 z-10 transition-all duration-200 cursor-pointer ${
+                                        selectedKeys.has(image.key) 
+                                        ? "opacity-100 scale-100" 
+                                        : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100"
+                                    }`}
+                                >
+                                    {selectedKeys.has(image.key) ? (
+                                        <div className="bg-sky-500 rounded-full shadow-lg ring-2 ring-background">
+                                            <CheckCircle2 className="h-6 w-6 text-white" />
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-full shadow-sm bg-black/20 border-[1.5px] border-white/70 backdrop-blur-sm h-6 w-6 hover:bg-black/40 hover:border-white transition-colors"></div>
+                                    )}
+                                </div>
+
+                                {/* Status Badge */}
+                                {image.status === "no_faces" && (
+                                    <div className="absolute top-2 right-2 z-10 bg-yellow-500/90 text-white rounded-full p-1 backdrop-blur-sm shadow-sm" title="No faces detected by AI">
+                                        <AlertCircle className="h-4 w-4" />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        {/* Intersection Observer Target */}
+                        {hasNextPage && (
+                            <div
+                                ref={ref}
+                                className="col-span-full h-32 flex items-center justify-center"
+                            >
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Floating Bulk Action Bar */}
+                {selectedKeys.size > 0 && (
+                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-900/60 border border-zinc-800 shadow-2xl rounded-full px-6 py-4 flex items-center gap-6 z-50 animate-in slide-in-from-bottom-10 text-white">
+                        <span className="font-medium whitespace-nowrap">
+                            {selectedKeys.size} image{selectedKeys.size !== 1 ? "s" : ""} selected
+                        </span>
+
+                        <button
+                            className="bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-md transition-colors flex items-center disabled:opacity-50"
+                            disabled={isDeleting}
+                            onClick={() => {
+                                if (window.confirm(`Are you absolutely sure you want to delete ${selectedKeys.size} image${selectedKeys.size !== 1 ? "s" : ""}? This cannot be undone.`)) {
+                                    deleteSelected();
+                                }
+                            }}
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Deleting ({deleteProgress}%)
+                                </>
+                            ) : (
+                                "Delete Selected"
+                            )}
+                        </button>
+                    </div>
+                )}
+                
+                <ImageLightbox 
+                    imageUrl={lightboxImage} 
+                    onClose={() => setLightboxImage(null)} 
+                />
             </div>
         </div>
+
+        {/* Edit Event Modal */}
+        {showEditModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
+                <div className="relative w-full max-w-md glass-card rounded-xl p-6 shadow-2xl">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="text-lg font-semibold text-[var(--foreground)]">Edit Event</h2>
+                        <button
+                            onClick={() => setShowEditModal(false)}
+                            className="p-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+                    <form onSubmit={handleEditEvent} className="space-y-4">
+                        <div>
+                            <label className="block text-[13px] font-medium text-[var(--foreground-secondary)] mb-1.5">
+                                Event Name <span className="text-red-400">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={editForm.name}
+                                onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                                className="w-full bg-[var(--card-hover)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500/50 transition-colors"
+                                placeholder="Event name"
+                                required
+                                autoFocus
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[13px] font-medium text-[var(--foreground-secondary)] mb-1.5">
+                                Description
+                            </label>
+                            <textarea
+                                value={editForm.description}
+                                onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
+                                onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleEditEvent(e as any); } }}
+                                rows={3}
+                                className="w-full bg-[var(--card-hover)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500/50 transition-colors resize-none"
+                                placeholder="Optional description... (Ctrl+Enter to save)"
+                            />
+                        </div>
+                        <DatePicker
+                            label="Event Date"
+                            value={editForm.date}
+                            onChange={date => setEditForm(p => ({ ...p, date }))}
+                        />
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => setShowEditModal(false)}
+                                className="flex-1 px-4 py-2.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={editSaving || !editForm.name.trim()}
+                                className="flex-1 px-4 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {editSaving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : "Save Changes"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
+        </>
     );
 }
-

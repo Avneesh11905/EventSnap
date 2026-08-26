@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
 import { UploadProvider } from "@/components/providers/UploadProvider";
+import ReactQueryProvider from "@/components/providers/ReactQueryProvider";
 import LayoutShell from "@/components/custom/LayoutShell";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
@@ -28,11 +29,13 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <SessionProvider>
-            <UploadProvider>
-              <div className="relative z-10 flex flex-col min-h-screen">
-                <LayoutShell>{children}</LayoutShell>
-              </div>
-            </UploadProvider>
+            <ReactQueryProvider>
+              <UploadProvider>
+                <div className="relative z-10 flex flex-col min-h-screen">
+                  <LayoutShell>{children}</LayoutShell>
+                </div>
+              </UploadProvider>
+            </ReactQueryProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>

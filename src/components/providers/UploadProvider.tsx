@@ -21,10 +21,13 @@ interface UploadState {
 }
 
 interface UploadContextType extends UploadState {
-    startUpload: (files: File[], event: { id: string; code: string; name: string }) => void;
+    startUpload: (files: File[], event: { id: string; code: string; name: string }, autoStart?: boolean) => void;
+    queueUpload: (files: File[], event: { id: string; code: string; name: string }) => void;
+    clearQueue: () => void;
     startEncodingPoll: (taskId: string, eventId: string) => void;
     dismissWidget: () => void;
     cancelUpload: () => void;
+    cancelEncoding: () => void;
     cleanupUploadState: () => void;
     minimizeWidget: () => void;
     maximizeWidget: () => void;
@@ -110,6 +113,10 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     const [imageCount, setImageCount] = useState(0);
     const [uploadingEventId, setUploadingEventId] = useState<string | null>(null);
     const [isWidgetMinimized, setIsWidgetMinimized] = useState(false);
+    // Pre-Upload Modal State
+    const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+    const [pendingEvent, setPendingEvent] = useState<{ id: string; code: string; name: string } | null>(null);
+    const [autoStartRecognition, setAutoStartRecognition] = useState(true);
 
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -125,7 +132,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
         // 2. Stop polling
         if (pollRef.current) {
-            clearInterval(pollRef.current);
+            if (typeof (pollRef.current as any).close === 'function') {
+                (pollRef.current as any).close();
+            } else {
+                clearInterval(pollRef.current as any);
+            }
             pollRef.current = null;
         }
 
@@ -170,7 +181,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                         setUploadingEventId(eventId);
                         setIsWidgetMinimized(false);
                         // No timeout needed, just run it
-                        pollEncodingStatus(taskId, eventId);
+                        listenEncodingStream(taskId, eventId);
                     }
                 } catch (e) {
                     localStorage.removeItem("eventsnap_active_upload");
@@ -207,7 +218,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    const pollEncodingStatus = (taskId: string, eventId: string) => {
+    const listenEncodingStream = (taskId: string, eventId: string) => {
         if (sessionStatus !== "authenticated") return;
         setUploadingEventId(eventId);
         setPhase("encoding");
@@ -218,42 +229,64 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
         localStorage.setItem("eventsnap_active_upload", JSON.stringify({ taskId, eventId }));
 
-        pollRef.current = setInterval(async () => {
-            try {
-                const res = await apiClient.get(`/api/upload/status?taskId=${taskId}`);
-                const data = res.data;
+        // Use EventSource instead of setInterval
+        const backendUrl = process.env.NEXT_PUBLIC_INFERENCE_BACKEND_URL || "http://localhost:8000";
+        const eventSource = new EventSource(`${backendUrl}/api/tasks/stream?taskId=${taskId}`);
+        
+        // Save to pollRef just so it can be cleaned up on unmount
+        pollRef.current = eventSource as any;
 
-                if (data.status === "PROCESSING" || data.status === "INITIALIZING") {
-                    // Python backends sends: progress: "45%", we must strip the % before parseInt
-                    const rawProgress = String(data.progress || "0").replace("%", "");
+        let isDone = false;
+
+        eventSource.addEventListener("message", (e) => {
+            try {
+                const data = JSON.parse(e.data);
+                if (data.state === "PROCESSING" || data.state === "INITIALIZING") {
+                    const rawProgress = String(data.info?.progress || "0").replace("%", "");
                     const pct = parseInt(rawProgress) || 0;
                     setEncodeProgress(pct);
                     setStatusMessage(
-                        data.status === "INITIALIZING"
+                        data.state === "INITIALIZING"
                             ? "Initializing model..."
-                            : `Processing ${data.images_processed || 0}/${data.total_images || "?"} images`
+                            : `Processing ${data.info?.processed || 0}/${data.info?.total || "?"} images`
                     );
-                } else if (data.status === "SUCCESS") {
+                } else if (data.state === "SUCCESS") {
+                    isDone = true;
                     setEncodeProgress(100);
                     setStatusMessage("Encoding complete!");
                     setPhase("done");
                     localStorage.removeItem("eventsnap_active_upload");
-                    if (pollRef.current) clearInterval(pollRef.current);
-                } else if (data.status === "FAILURE") {
-                    setErrorMessage("Encoding failed on backend.");
+                    eventSource.close();
+                } else if (data.state === "FAILURE" || data.state === "REVOKED") {
+                    isDone = true;
+                    setErrorMessage("Encoding failed or was canceled on backend.");
                     setPhase("error");
                     localStorage.removeItem("eventsnap_active_upload");
-                    if (pollRef.current) clearInterval(pollRef.current);
+                    eventSource.close();
                 }
-            } catch {
-                // Silently retry on network hiccups
+            } catch (err) {
+                console.error("SSE parsing error", err);
             }
-        }, 2000);
+        });
+
+        eventSource.addEventListener("done", () => {
+            isDone = true;
+            eventSource.close();
+        });
+
+        eventSource.onerror = () => {
+            if (isDone) return;
+            setErrorMessage("Connection to processing server lost.");
+            setPhase("error");
+            localStorage.removeItem("eventsnap_active_upload");
+            eventSource.close();
+        };
     };
 
-    const startUpload = async (files: File[], event: { id: string; code: string; name: string }) => {
+    const startUpload = async (files: File[], event: { id: string; code: string; name: string }, autoStart?: boolean) => {
         if (sessionStatus !== "authenticated") return;
         if (!files.length || !event) return;
+        if (phase === "uploading" || phase === "extracting") return;
 
         setPhase("uploading");
         setProgress(0);
@@ -265,7 +298,15 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         setIsWidgetDismissed(false);
         setIsWidgetMinimized(false);
 
-        if (pollRef.current) clearInterval(pollRef.current);
+        if (pollRef.current) {
+            if (typeof pollRef.current.close === 'function') {
+                pollRef.current.close();
+            } else {
+                clearInterval(pollRef.current);
+            }
+            pollRef.current = null;
+        }
+        
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
 
@@ -306,7 +347,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 await apiClient.patch(`/api/events/${event.id}`, {
                     photo_count: countToSync,
                     total_size_mb: mbToSync
-                }, { signal: abortController.signal });
+                });
             } catch (err) {
                 console.error("Incremental DB sync failed", err);
                 // Restore counts so they are retried on the next batch
@@ -469,6 +510,21 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
                 await commitPendingSync();
             }
 
+            // Check if autoStart is requested
+            if (autoStart) {
+                setStatusMessage("Triggering AI Recognition...");
+                try {
+                    const encodeRes = await apiClient.post("/api/encode", { eventId: event.id });
+                    if (encodeRes.data.success && encodeRes.data.task_id) {
+                        listenEncodingStream(encodeRes.data.task_id, event.id);
+                        return; // Exit upload function, listenEncodingStream takes over the phase
+                    }
+                } catch (err) {
+                    console.error("Auto-trigger encoding failed:", err);
+                    // Fallthrough to done phase if it fails so they can trigger manually
+                }
+            }
+
             // All done. We do NOT auto-trigger encoding anymore! The user triggers it manually.
             const newlyUploadedCount = successCount - skippedCount;
             setProgress(100);
@@ -490,6 +546,8 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
             const isAborted = error.name === "AbortError" ||
                 error.message === "Upload canceled by user." ||
+                error.name === "CanceledError" ||
+                error.code === "ERR_CANCELED" ||
                 abortController.signal.aborted ||
                 sessionStatus !== "authenticated";
 
@@ -518,6 +576,23 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const cancelEncoding = async () => {
+        if (!uploadingEventId) return;
+        try {
+            await apiClient.post("/api/encode/cancel", { eventId: uploadingEventId });
+            setPhase("idle");
+            setStatusMessage("Encoding canceled.");
+            localStorage.removeItem("eventsnap_active_upload");
+            if (pollRef.current) {
+                pollRef.current.close();
+                pollRef.current = null;
+            }
+        } catch (err) {
+            console.error("Failed to cancel encoding", err);
+            setErrorMessage("Failed to cancel encoding on server.");
+        }
+    };
+
     const [isWidgetDismissed, setIsWidgetDismissed] = useState(false);
 
     const dismissWidget = () => {
@@ -527,6 +602,20 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
     const minimizeWidget = () => setIsWidgetMinimized(true);
     const maximizeWidget = () => setIsWidgetMinimized(false);
+
+    const queueUpload = (files: File[], event: { id: string; code: string; name: string }) => {
+        if (phase === "uploading" || phase === "extracting") {
+            alert("An upload process is already running. Please wait for it to finish or cancel it before starting a new one.");
+            return;
+        }
+        setPendingFiles(files);
+        setPendingEvent(event);
+    };
+
+    const clearQueue = () => {
+        setPendingFiles([]);
+        setPendingEvent(null);
+    };
 
     const value = {
         isUploading: phase !== "idle" && phase !== "done" && phase !== "error",
@@ -538,9 +627,12 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         imageCount,
         uploadingEventId,
         startUpload,
-        startEncodingPoll: pollEncodingStatus,
+        queueUpload,
+        clearQueue,
+        startEncodingPoll: listenEncodingStream,
         dismissWidget,
         cancelUpload,
+        cancelEncoding,
         cleanupUploadState,
         minimizeWidget,
         maximizeWidget,
@@ -551,8 +643,96 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     return (
         <UploadContext.Provider value={value}>
             {children}
+            {pendingFiles.length > 0 && pendingEvent && (
+                <PreUploadModal
+                    files={pendingFiles}
+                    event={pendingEvent}
+                    autoStartRecognition={autoStartRecognition}
+                    setAutoStartRecognition={setAutoStartRecognition}
+                    onConfirm={() => {
+                        startUpload(pendingFiles, pendingEvent, autoStartRecognition);
+                        clearQueue();
+                    }}
+                    onClose={clearQueue}
+                />
+            )}
             {phase !== "idle" && !isWidgetDismissed && <UploadWidget />}
         </UploadContext.Provider>
+    );
+}
+
+function PreUploadModal({ 
+    files, 
+    event, 
+    autoStartRecognition, 
+    setAutoStartRecognition, 
+    onConfirm, 
+    onClose 
+}: { 
+    files: File[], 
+    event: { id: string; code: string; name: string },
+    autoStartRecognition: boolean,
+    setAutoStartRecognition: (val: boolean) => void,
+    onConfirm: () => void,
+    onClose: () => void
+}) {
+    // We only preview the first 12 images to prevent lag
+    const previewFiles = files.slice(0, 12);
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-[#0f0f11] border border-zinc-800 rounded-2xl p-6 w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-xl font-bold text-white tracking-tight">Upload Photos</h2>
+                        <p className="text-sm text-zinc-400 mt-1">To event <span className="font-medium text-zinc-300">{event.name}</span></p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-4">
+                        {previewFiles.map((file, i) => (
+                            <div key={i} className="aspect-square relative rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900">
+                                <img
+                                    src={URL.createObjectURL(file)}
+                                    alt="Preview"
+                                    className="object-cover w-full h-full"
+                                    onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+                                />
+                            </div>
+                        ))}
+                        {files.length > 12 && (
+                            <div className="aspect-square relative rounded-lg border border-zinc-800 bg-zinc-900 flex items-center justify-center">
+                                <span className="text-sm font-medium text-zinc-400">+{files.length - 12}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <label className="flex items-center gap-2.5 cursor-pointer text-sm text-zinc-400 font-medium hover:text-zinc-300 transition-colors">
+                        <input 
+                            type="checkbox" 
+                            checked={autoStartRecognition} 
+                            onChange={(e) => setAutoStartRecognition(e.target.checked)} 
+                            className="rounded border-zinc-700 bg-zinc-900 text-sky-500 focus:ring-sky-500 w-4 h-4 cursor-pointer"
+                        />
+                        Automatically start AI recognition
+                    </label>
+                    <div className="flex gap-3 w-full sm:w-auto">
+                        <button onClick={onClose} className="flex-1 sm:flex-none px-4 py-2 rounded-md font-medium text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-800 transition-colors">
+                            Cancel
+                        </button>
+                        <button onClick={onConfirm} className="flex-1 sm:flex-none px-6 py-2 rounded-md font-medium text-sm bg-sky-500 hover:bg-sky-400 text-white shadow-lg transition-colors flex items-center justify-center gap-2">
+                            Upload {files.length} {files.length === 1 ? 'Photo' : 'Photos'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -566,9 +746,11 @@ function UploadWidget() {
         isWidgetMinimized,
         dismissWidget,
         cancelUpload,
+        cancelEncoding,
         cleanupUploadState,
         minimizeWidget,
         maximizeWidget,
+        uploadingEventId,
     } = useUpload();
 
     if (isWidgetMinimized) {
@@ -656,14 +838,21 @@ function UploadWidget() {
                                 </span>
                                 <span className="text-[11px] font-medium text-white/30 uppercase tracking-wider">%</span>
                             </div>
-                            {phase === "uploading" && (
+                            {phase === "uploading" ? (
                                 <button
                                     onClick={cancelUpload}
                                     className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider transition-colors border border-red-500/20"
                                 >
-                                    Cancel
+                                    Cancel Upload
                                 </button>
-                            )}
+                            ) : phase === "encoding" ? (
+                                <button
+                                    onClick={cancelEncoding}
+                                    className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider transition-colors border border-red-500/20"
+                                >
+                                    Cancel AI
+                                </button>
+                            ) : null}
                         </div>
 
                         <div className="h-2 bg-white/[0.03] rounded-full overflow-hidden border border-white/5 p-[1px]">
@@ -681,7 +870,7 @@ function UploadWidget() {
 
             {phase === "done" && (
                 <div className="px-4 pb-4 pt-1 flex justify-end">
-                    <Link href="/organizer/dashboard" onClick={dismissWidget} className="btn-ghost text-xs py-1.5 px-3">
+                    <Link href={`/organizer/events/${uploadingEventId}`} onClick={dismissWidget} className="btn-ghost text-xs py-1.5 px-3">
                         Go to Event
                     </Link>
                 </div>

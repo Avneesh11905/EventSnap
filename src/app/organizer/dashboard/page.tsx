@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/axios";
 import { useUpload } from "@/components/providers/UploadProvider";
+import { DatePicker } from "@/components/DatePicker";
 
 interface AttendeeAccess {
     id: string;
@@ -111,7 +112,8 @@ export default function DashboardPage() {
         return () => clearInterval(interval);
     }, [isUploading]);
 
-    const handleCreate = async () => {
+    const handleCreate = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         if (!newEvent.name.trim()) return;
         setCreating(true);
         setError("");
@@ -122,6 +124,7 @@ export default function DashboardPage() {
                 setEvents((prev) => [data.event, ...prev]);
                 setShowModal(false);
                 setNewEvent({ name: "", description: "", date: "" });
+                router.push(`/organizer/events/${data.event.id}`);
             } else {
                 setError(data.err);
             }
@@ -212,63 +215,63 @@ export default function DashboardPage() {
         <div className="py-6">
 
             <div className="max-w-6xl mx-auto px-6">
-                {/* Welcome + New Event */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
+                {/* Welcome + New Event + Inline Stats */}
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-10">
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)] mb-2">
                             Dashboard
                         </h1>
-                        <p className="text-[var(--foreground-secondary)] text-[14px] mt-1">Manage your events and track attendee engagement</p>
+                        <p className="text-[15px] text-[var(--foreground-secondary)]">Manage your events and track attendee engagement.</p>
+                        
+                        {/* Inline Metrics Row */}
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 mt-5 text-[13px]">
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <Calendar size={14} />
+                                <span className="font-medium text-[var(--foreground)]">{events.length}</span> Events
+                            </div>
+                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
+                            
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <ImageIcon size={14} />
+                                <span className="font-medium text-[var(--foreground)]">{totalPhotos.toLocaleString()}</span> Photos
+                            </div>
+                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
+                            
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <Users size={14} />
+                                <span className="font-medium text-[var(--foreground)]">{totalAttendees.toLocaleString()}</span> Guests
+                            </div>
+                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
+                            
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <Download size={14} />
+                                <span className="font-medium text-[var(--foreground)]">{totalDownloads.toLocaleString()}</span> Saves
+                            </div>
+                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
+                            
+                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
+                                <HardDrive size={14} />
+                                <span className="font-medium text-[var(--foreground)]">{totalSizeMB.toFixed(1)} MB</span> Storage
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    
+                    <div className="flex items-center gap-3 shrink-0">
                         <button
                             onClick={async () => { setRefreshing(true); await fetchEvents(); setRefreshing(false); }}
-                            className="p-2 rounded-md border border-[var(--border)] bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--border)] transition-colors"
+                            className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--border)] transition-colors shadow-sm"
                             title="Refresh data"
                         >
                             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
                         </button>
                         <button
                             onClick={() => setShowModal(true)}
-                            className="btn-primary flex items-center gap-2"
+                            className="btn-primary flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm"
                         >
-                            <Plus size={16} />
-                            New Event
+                            <Plus size={16} /> New Event
                         </button>
                     </div>
                 </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    {[
-                        { label: "Total Events", value: events.length, icon: Calendar },
-                        { label: "Total Photos", value: totalPhotos, icon: ImageIcon },
-                        { label: "Total Attendees", value: totalAttendees, icon: Users },
-                        { label: "Total Downloads", value: totalDownloads, icon: Download },
-                    ].map((stat) => (
-                        <div key={stat.label} className="glass-card rounded-xl p-6 relative overflow-hidden">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="w-10 h-10 rounded-md bg-[var(--card-hover)] border border-[var(--border)] flex items-center justify-center">
-                                    <stat.icon size={18} className="text-[var(--foreground-secondary)]" />
-                                </div>
-                            </div>
-                            <p className="text-3xl font-bold tracking-tight mb-1 text-[var(--foreground)]">{stat.value}</p>
-                            <span className="text-[13px] font-medium text-[var(--foreground-secondary)]">{stat.label}</span>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Storage */}
-                {totalSizeMB > 0 && (
-                    <div className="glass-card rounded-md p-3 mb-6 flex items-center gap-3 text-sm text-[var(--foreground-secondary)]">
-                        <div className="w-6 h-6 rounded-md bg-[var(--card-hover)] border border-[var(--border)] flex items-center justify-center">
-                            <HardDrive size={14} className="text-[var(--foreground-secondary)]" />
-                        </div>
-                        <div>
-                            Storage: <span className="text-[var(--foreground)] font-medium">{totalSizeMB.toFixed(1)} MB</span> used across {events.length} events
-                        </div>
-                    </div>
-                )}
 
                 {/* Error */}
                 {error && (
@@ -293,77 +296,84 @@ export default function DashboardPage() {
                         </button>
                     </div>
                 ) : (
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                         {events.map((event) => (
-                            <div key={event.id} className="glass-card rounded-xl overflow-hidden flex flex-col group card-hover">
-                                <Link href={`/organizer/events/${event.id}`} className="block p-5 pb-4">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div className="flex-1 min-w-0 pr-4">
-                                            <h3 className="text-[16px] font-semibold tracking-tight truncate text-[var(--foreground)]">{event.name}</h3>
+                            <div key={event.id} className="glass-card rounded-xl overflow-hidden flex flex-col group card-hover text-sm">
+                                <Link href={`/organizer/events/${event.id}`} className="block p-4 pb-3">
+                                    <div className="flex items-start justify-between mb-1.5">
+                                        <div className="flex-1 min-w-0 pr-3">
+                                            <h3 className="text-[15px] font-semibold tracking-tight truncate text-[var(--foreground)]">{event.name}</h3>
                                             {event.description && (
-                                                <p className="text-[13px] text-[var(--foreground-secondary)] mt-1 line-clamp-2 leading-relaxed">{event.description}</p>
+                                                <p className="text-[12px] text-[var(--foreground-secondary)] mt-0.5 line-clamp-1 leading-relaxed">{event.description}</p>
                                             )}
                                         </div>
-                                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-sm border ${statusColors[event.status]} shrink-0 uppercase tracking-wider`}>
+                                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-sm border ${statusColors[event.status]} shrink-0 uppercase tracking-wider`}>
                                             {event.status}
                                         </span>
                                     </div>
                                 </Link>
 
-                                <div className="px-5 flex-1">
-                                    <div className="flex items-center gap-2 mb-5 bg-[var(--card-hover)] border border-[var(--border)] p-1.5 rounded-md">
-                                        <span className="font-mono text-[13px] font-medium text-[var(--foreground-secondary)] flex-1 text-center tracking-widest uppercase">
+                                <div className="px-4 flex-1">
+                                    <button 
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            copyCode(event.code);
+                                        }}
+                                        className="w-full flex items-center gap-2 mb-4 bg-[var(--card-hover)] hover:bg-[var(--card-hover)]/80 border border-[var(--border)] p-1 rounded-md transition-colors group/copy cursor-pointer"
+                                        title="Click to copy event code"
+                                    >
+                                        <span className="font-mono text-[12px] font-medium text-[var(--foreground-secondary)] group-hover/copy:text-[var(--foreground)] transition-colors flex-1 text-center tracking-widest uppercase">
                                             {event.code}
                                         </span>
-                                        <button
-                                            onClick={() => copyCode(event.code)}
-                                            className="w-7 h-7 flex items-center justify-center rounded bg-[var(--border)] hover:bg-zinc-700 transition-colors"
-                                            title="Copy event code"
+                                        <div
+                                            className="w-6 h-6 flex items-center justify-center rounded bg-[var(--border)] group-hover/copy:bg-zinc-700 transition-colors shrink-0"
                                         >
                                             {copiedCode === event.code ? (
-                                                <Check size={14} className="text-emerald-500" />
+                                                <Check size={12} className="text-emerald-500" />
                                             ) : (
-                                                <Copy size={14} className="text-[var(--foreground-secondary)]" />
+                                                <Copy size={12} className="text-[var(--foreground-secondary)] group-hover/copy:text-[var(--foreground)] transition-colors" />
                                             )}
-                                        </button>
-                                    </div>
+                                        </div>
+                                    </button>
 
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-md p-3 text-center">
-                                            <p className="text-[18px] font-semibold text-[var(--foreground)]">
+                                    <div className="flex items-center justify-between py-2 mt-2 mb-4">
+                                        <div className="text-center flex-1">
+                                            <p className="text-[17px] font-semibold text-[var(--foreground)]">
                                                 {uploadingEventId === event.id && (phase === "uploading" || phase === "encoding") && imageCount > 0 ? imageCount : (event.photo_count || 0)}
                                             </p>
-                                            <p className="text-[11px] font-medium text-[var(--foreground-secondary)] uppercase tracking-wider mt-0.5">Photos</p>
+                                            <p className="text-[10px] font-medium text-[var(--foreground-secondary)] uppercase tracking-wider mt-1">Photos</p>
                                         </div>
-                                        <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-md p-3 text-center">
-                                            <p className="text-[18px] font-semibold text-[var(--foreground)]">{event.attendeesAccessed?.length || 0}</p>
-                                            <p className="text-[11px] font-medium text-[var(--foreground-secondary)] uppercase tracking-wider mt-0.5">Guests</p>
+                                        <div className="w-[1px] h-8 bg-[var(--border)]"></div>
+                                        <div className="text-center flex-1">
+                                            <p className="text-[17px] font-semibold text-[var(--foreground)]">{event.attendeesAccessed?.length || 0}</p>
+                                            <p className="text-[10px] font-medium text-[var(--foreground-secondary)] uppercase tracking-wider mt-1">Guests</p>
                                         </div>
-                                        <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-md p-3 text-center">
-                                            <p className="text-[18px] font-semibold text-[var(--foreground)]">{event.download_count || 0}</p>
-                                            <p className="text-[11px] font-medium text-[var(--foreground-secondary)] uppercase tracking-wider mt-0.5">Saves</p>
+                                        <div className="w-[1px] h-8 bg-[var(--border)]"></div>
+                                        <div className="text-center flex-1">
+                                            <p className="text-[17px] font-semibold text-[var(--foreground)]">{event.download_count || 0}</p>
+                                            <p className="text-[10px] font-medium text-[var(--foreground-secondary)] uppercase tracking-wider mt-1">Saves</p>
                                         </div>
                                     </div>
 
                                     {/* Active Upload/Encoding Progress */}
                                     {uploadingEventId === event.id && (phase === "uploading" || phase === "encoding" || phase === "extracting") && (
-                                        <div className="mt-4 p-3 rounded-xl bg-black/20 border border-white/5 animate-fade-in">
+                                        <div className="mt-3 p-2.5 rounded-lg bg-[var(--card-hover)] border border-[var(--border)] animate-fade-in">
                                             <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-2 text-xs font-medium text-[var(--foreground)]/70">
+                                                <div className="flex items-center gap-2 text-[11px] font-medium text-[var(--foreground)]">
                                                     {phase === "uploading" ? (
-                                                        <Loader2 size={14} className="animate-spin text-sky-400" />
+                                                        <Loader2 size={12} className="animate-spin text-sky-400" />
                                                     ) : phase === "extracting" ? (
-                                                        <Loader2 size={14} className="animate-spin text-amber-500" />
+                                                        <Loader2 size={12} className="animate-spin text-amber-500" />
                                                     ) : (
-                                                        <Cpu size={14} className="text-sky-400 animate-pulse" />
+                                                        <Cpu size={12} className="text-sky-400 animate-pulse" />
                                                     )}
-                                                    <span className="truncate max-w-[150px]">{statusMessage}</span>
+                                                    <span className="truncate max-w-[120px]">{statusMessage}</span>
                                                 </div>
-                                                <span className="text-xs text-[var(--foreground)]/50">
+                                                <span className="text-[10px] font-medium text-[var(--foreground-secondary)]">
                                                     {phase === "extracting" ? "..." : `${phase === "uploading" ? progress : encodeProgress}%`}
                                                 </span>
                                             </div>
-                                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                            <div className="h-1 bg-black/40 rounded-full overflow-hidden">
                                                 <div
                                                     className={`h-full rounded-full transition-all duration-300 ${phase === "uploading" ? "bg-sky-500" :
                                                         phase === "extracting" ? "bg-amber-500 w-full animate-[pulse_2s_ease-in-out_infinite]" :
@@ -378,34 +388,33 @@ export default function DashboardPage() {
 
                                 {/* Attendee Accordion */}
                                 {event.attendeesAccessed?.length > 0 && (
-                                    <div className="border-t border-[var(--border)] mt-5">
+                                    <div className="border-t border-[var(--border)] mt-4">
                                         <button
                                             onClick={() => setExpandedEvent(expandedEvent === event.id ? null : event.id)}
-                                            className="w-full px-5 py-3 text-left text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors flex items-center justify-between"
+                                            className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors flex items-center justify-between"
                                         >
-                                            <span className="flex items-center gap-2">
-                                                <BarChart3 size={14} />
+                                            <span className="flex items-center gap-1.5">
+                                                <BarChart3 size={12} />
                                                 Attendee Activity
                                             </span>
                                             <ArrowUpRight
-                                                size={14}
+                                                size={12}
                                                 className={`transition-transform duration-200 ${expandedEvent === event.id ? "rotate-90" : ""}`}
                                             />
                                         </button>
                                         {expandedEvent === event.id && (
-                                            <div className="px-5 pb-4 space-y-2">
+                                            <div className="px-4 pb-3 space-y-1.5">
                                                 {event.attendeesAccessed.map((attendee: AttendeeAccess) => (
-                                                    <div key={attendee.id} className="flex items-center justify-between text-[13px] py-1.5 px-3 rounded-md bg-[var(--card-hover)] border border-[var(--border)]">
+                                                    <div key={attendee.id} className="flex items-center justify-between text-[11px] py-1.5 px-2.5 rounded-md bg-[var(--card-hover)] border border-[var(--border)]">
                                                         <div>
                                                             <p className="font-medium text-[var(--foreground)]">{attendee.name}</p>
-                                                            <p className="text-[11px] text-[var(--foreground-secondary)]">{attendee.email}</p>
                                                         </div>
                                                         {attendee.downloaded_at ? (
-                                                            <span className="text-[11px] text-emerald-500 flex items-center gap-1">
-                                                                <Download size={12} /> Downloaded
+                                                            <span className="text-emerald-500 flex items-center gap-1 font-medium">
+                                                                <Download size={10} /> Saved
                                                             </span>
                                                         ) : (
-                                                            <span className="text-[11px] text-[var(--foreground-secondary)]">Viewed</span>
+                                                            <span className="text-[var(--foreground-secondary)] font-medium">Viewed</span>
                                                         )}
                                                     </div>
                                                 ))}
@@ -415,23 +424,28 @@ export default function DashboardPage() {
                                 )}
 
                                 {/* Card Footer */}
-                                <div className="border-t border-[var(--border)] px-5 py-3 flex items-center justify-between mt-auto">
-                                    <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
-                                        <Calendar size={12} />
-                                        {event.date
-                                            ? new Date(event.date).toLocaleDateString()
-                                            : new Date(event.created_at).toLocaleDateString()}
+                                <div className="bg-[var(--card-hover)]/30 border-t border-[var(--border)] px-4 py-2 flex items-center justify-between mt-auto">
+                                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--foreground-secondary)]">
+                                        <Calendar size={11} className="shrink-0" />
+                                        <span className="leading-none pt-[1px]">
+                                            {event.date
+                                                ? new Date(event.date).toLocaleDateString()
+                                                : new Date(event.created_at).toLocaleDateString()}
+                                        </span>
                                         {event.total_size_mb > 0 && (
-                                            <span className="ml-2">· {event.total_size_mb.toFixed(1)} MB</span>
+                                            <>
+                                                <span className="w-1 h-1 rounded-full bg-[var(--border)] shrink-0 mx-0.5"></span>
+                                                <span className="leading-none pt-[1px]">{event.total_size_mb.toFixed(1)} MB</span>
+                                            </>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-1 z-10 relative">
+                                    <div className="flex items-center shrink-0">
                                         <button
                                             onClick={() => handleDelete(event.id)}
-                                            className="p-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-red-400 hover:bg-[var(--card-hover)] transition-colors"
+                                            className="p-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                             title="Delete event"
                                         >
-                                            <Trash2 size={14} />
+                                            <Trash2 size={13} />
                                         </button>
                                     </div>
                                 </div>
@@ -446,22 +460,23 @@ export default function DashboardPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowModal(false)} />
                     <div className="relative w-full max-w-md glass-card rounded-xl p-6 shadow-2xl">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-[var(--foreground)]">Create Event</h2>
-                            <button onClick={() => setShowModal(false)} className="p-2 rounded-md hover:bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors">
-                                <X size={16} />
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-lg font-semibold text-[var(--foreground)]">Create Event</h2>
+                            <button onClick={() => setShowModal(false)} className="p-1.5 rounded-md hover:bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors">
+                                <X size={18} />
                             </button>
                         </div>
 
-                        <div className="space-y-4">
+                        <form onSubmit={handleCreate} className="space-y-4">
                             <div>
-                                <label className="text-[13px] font-medium text-[var(--foreground-secondary)] mb-1.5 block">Event Name *</label>
+                                <label className="text-[13px] font-medium text-[var(--foreground-secondary)] mb-1.5 block">Event Name <span className="text-red-400">*</span></label>
                                 <input
                                     type="text"
                                     value={newEvent.name}
                                     onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
                                     placeholder="e.g. Tech Conference 2026"
-                                    className="input-field"
+                                    className="w-full bg-[var(--card-hover)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500/50 transition-colors"
+                                    autoFocus
                                 />
                             </div>
                             <div>
@@ -471,33 +486,33 @@ export default function DashboardPage() {
                                     onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
                                     placeholder="Brief description of your event..."
                                     rows={3}
-                                    className="input-field resize-none"
+                                    className="w-full bg-[var(--card-hover)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500/50 transition-colors resize-none"
                                 />
                             </div>
-                            <div>
-                                <label className="text-[13px] font-medium text-[var(--foreground-secondary)] mb-1.5 block">Date</label>
-                                <input
-                                    type="date"
-                                    value={newEvent.date}
-                                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                                    className="input-field"
-                                />
-                            </div>
-                        </div>
+                            <DatePicker
+                                label="Date"
+                                value={newEvent.date}
+                                onChange={date => setNewEvent({ ...newEvent, date })}
+                            />
 
-                        <div className="flex gap-3 mt-8">
-                            <button onClick={() => setShowModal(false)} className="btn-ghost flex-1">
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleCreate}
-                                disabled={creating || !newEvent.name.trim()}
-                                className="btn-primary flex-1 flex items-center justify-center gap-2"
-                            >
-                                {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                {creating ? "Creating..." : "Create"}
-                            </button>
-                        </div>
+                            <div className="flex gap-3 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                    className="flex-1 px-4 py-2.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={creating || !newEvent.name.trim()}
+                                    className="flex-1 px-4 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                    {creating ? "Creating..." : "Create"}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
