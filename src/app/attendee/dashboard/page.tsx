@@ -143,7 +143,7 @@ export default function AttendeeDashboard() {
     }
 
     return (
-        <div className="px-4 py-8 max-w-3xl mx-auto">
+        <div className="px-6 md:px-8 py-10 md:py-14 max-w-5xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                 <div>
@@ -155,7 +155,7 @@ export default function AttendeeDashboard() {
                 <div className="flex items-center gap-3">
                     {isOrganizer && (
                         <Link
-                            href="/organizer/dashboard"
+                            href="/organizer/events"
                             className="btn-ghost flex items-center gap-2 text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
                         >
                             <Calendar size={16} /> Organizer Dashboard
@@ -171,20 +171,20 @@ export default function AttendeeDashboard() {
 
 
                 {/* Face encoding status */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-md flex items-center justify-center border ${hasEncoding ? "bg-emerald-500/10 border-emerald-500/20" : "bg-amber-500/10 border-amber-500/20"}`}>
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className={`w-10 h-10 shrink-0 rounded-md flex items-center justify-center border ${hasEncoding ? "bg-emerald-500/10 border-emerald-500/20" : "bg-amber-500/10 border-amber-500/20"}`}>
                             {hasEncoding ? (
                                 <CheckCircle size={18} className="text-emerald-500" />
                             ) : (
                                 <ScanFace size={18} className="text-amber-500" />
                             )}
                         </div>
-                        <div>
-                            <p className="text-[15px] font-semibold tracking-tight text-[var(--foreground)]">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[15px] font-semibold tracking-tight text-[var(--foreground)] truncate">
                                 {hasEncoding ? "Face Scan Active" : "No Face Scan"}
                             </p>
-                            <p className="text-[13px] text-[var(--foreground-secondary)]">
+                            <p className="text-[13px] text-[var(--foreground-secondary)] truncate md:whitespace-normal">
                                 {hasEncoding
                                     ? "Your face data is ready for photo matching."
                                     : "Set up a face scan to find your photos."}
@@ -192,12 +192,12 @@ export default function AttendeeDashboard() {
                         </div>
                     </div>
                     {hasEncoding ? (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 shrink-0">
                             <button
                                 onClick={handleClearEncoding}
                                 className="btn-ghost flex items-center gap-2"
                             >
-                                <RefreshCw size={16} />
+                                <RefreshCw size={16} className="hidden sm:block" />
                                 Re-scan
                             </button>
                             <button
@@ -208,8 +208,8 @@ export default function AttendeeDashboard() {
                             </button>
                         </div>
                     ) : (
-                        <Link href="/attendee/setup" className="btn-primary flex items-center gap-2">
-                            <Camera size={16} /> Set Up
+                        <Link href="/attendee/setup" className="btn-primary shrink-0 flex items-center gap-2">
+                            <Camera size={16} className="hidden sm:block" /> Set Up
                         </Link>
                     )}
                 </div>
@@ -235,7 +235,7 @@ export default function AttendeeDashboard() {
                     <p className="text-[14px] text-[var(--foreground-secondary)] mb-6 max-w-sm mx-auto">
                         Enter an event code to find your photos instantly.
                     </p>
-                    <button onClick={() => setShowScanModal(true)} className="btn-primary inline-flex items-center gap-2"><Search size={16} /> Scan Your First Event</button>
+                    <button onClick={() => setShowScanModal(true)} className="btn-primary mx-auto inline-flex items-center gap-2"><Search size={16} /> Scan Your First Event</button>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -327,7 +327,7 @@ export default function AttendeeDashboard() {
                             <button
                                 onClick={() => setShowDeleteModal(false)}
                                 disabled={isDeletingEncoding}
-                                className="btn-ghost flex-1 text-[var(--foreground-secondary)] hover:text-white"
+                                className="btn-ghost flex-1 text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
                             >
                                 Cancel
                             </button>
@@ -353,7 +353,7 @@ export default function AttendeeDashboard() {
                     <div className="glass-card rounded-xl p-6 w-full max-w-sm shadow-2xl">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-[var(--foreground)]">Scan Event</h3>
-                            <button onClick={() => { setShowScanModal(false); setScanError(""); setScanCode(""); }} className="text-[var(--foreground-secondary)] hover:text-white">
+                            <button onClick={() => { setShowScanModal(false); setScanError(""); setScanCode(""); }} className="text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors">
                                 <X size={20} />
                             </button>
                         </div>

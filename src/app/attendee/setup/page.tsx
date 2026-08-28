@@ -363,9 +363,9 @@ function AttendeeSetupContent() {
               <div
                 key={i}
                 className={`h-1 rounded-full transition-all duration-300 ${captures[i]
-                  ? "w-8 bg-zinc-400"
+                  ? "w-8 bg-[var(--foreground-secondary)]"
                   : i === currentAngle && encodeStep === "capture"
-                    ? "w-8 bg-zinc-100"
+                    ? "w-8 bg-[var(--foreground)]"
                     : "w-4 bg-[var(--border)]"
                   }`}
               />
@@ -406,7 +406,7 @@ function AttendeeSetupContent() {
             )}
 
             {!cameraActive && !currentCapture && (isStartingCamera || captures.some(c => c !== null)) && (
-              <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl aspect-square flex flex-col items-center justify-center text-[var(--foreground-secondary)] ring-1 ring-zinc-800">
+              <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-xl aspect-square flex flex-col items-center justify-center text-[var(--foreground-secondary)] ring-1 ring-[var(--border)]">
                 <Loader2 size={32} className="animate-spin mb-4" />
                 <p className="text-sm font-medium">Starting Camera...</p>
               </div>
@@ -419,7 +419,7 @@ function AttendeeSetupContent() {
                   <p className="font-medium text-[14px] text-[var(--foreground)]">{angleConfig.label}</p>
                 </div>
 
-                <div className="relative rounded-xl overflow-hidden aspect-square bg-[var(--card-hover)] ring-1 ring-zinc-800">
+                <div className="relative rounded-xl overflow-hidden aspect-square bg-[var(--card-hover)] ring-1 ring-[var(--border)]">
                   <video
                     ref={videoRef}
                     autoPlay
@@ -429,7 +429,7 @@ function AttendeeSetupContent() {
                     style={{ transform: "scaleX(-1)" }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-48 h-48 rounded-full border-2 border-zinc-100/20 border-dashed" />
+                    <div className="w-48 h-48 rounded-full border-2 border-[var(--foreground)]/20 border-dashed" />
                   </div>
                   <div className="absolute top-3 left-3 bg-[var(--card-hover)]/80 backdrop-blur-sm rounded-md px-2 py-1 text-[11px] text-[var(--foreground-secondary)] font-medium border border-[var(--border)]">
                     {currentAngle + 1} / 3
@@ -459,7 +459,7 @@ function AttendeeSetupContent() {
                   <p className="font-medium text-[14px] text-[var(--foreground)]">{angleConfig.label}</p>
                 </div>
 
-                <div className="relative rounded-xl overflow-hidden aspect-square ring-1 ring-zinc-800 bg-[var(--card-hover)]">
+                <div className="relative rounded-xl overflow-hidden aspect-square ring-1 ring-[var(--border)] bg-[var(--card-hover)]">
                   <Image src={currentCapture.previewUrl} alt={`${angleConfig.label} capture`} fill className="object-cover" />
                   <div className="absolute top-3 right-3">
                     <div className="bg-[var(--card-hover)] border border-[var(--border)] rounded-md p-1.5">
@@ -491,7 +491,7 @@ function AttendeeSetupContent() {
                   <div key={angle.key} className="space-y-2">
                     <div
                       className={`relative rounded-md overflow-hidden aspect-square ring-2 bg-[var(--card-hover)] group cursor-pointer ${
-                        multiFaceError ? "ring-red-500" : "ring-zinc-800"
+                        multiFaceError ? "ring-red-500" : "ring-[var(--border)]"
                       }`}
                       onClick={() => retakeFromReview(i)}
                     >

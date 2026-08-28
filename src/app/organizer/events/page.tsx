@@ -154,19 +154,6 @@ export default function DashboardPage() {
         setTimeout(() => setCopiedCode(null), 2000);
     };
 
-    // Dynamic total photo count calculation
-    const totalPhotos = events.reduce((sum, e) => {
-        // If this specific event is actively uploading, use the live counter instead of the stale DB value
-        if (uploadingEventId === e.id && (phase === "uploading" || phase === "encoding") && imageCount > 0) {
-            return sum + imageCount;
-        }
-        return sum + (e.photo_count || 0);
-    }, 0);
-
-    const totalAttendees = events.reduce((sum, e) => sum + (e.attendeesAccessed?.length || 0), 0);
-    const totalDownloads = events.reduce((sum, e) => sum + (e.download_count || 0), 0);
-    const totalSizeMB = events.reduce((sum, e) => sum + (e.total_size_mb || 0), 0);
-
     const statusColors: Record<string, string> = {
         active: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
         draft: "bg-[var(--border)] text-[var(--foreground-secondary)] border-[var(--border)]",
@@ -175,8 +162,8 @@ export default function DashboardPage() {
 
     if (!session || loading) {
         return (
-            <div className="py-8">
-                <div className="max-w-6xl mx-auto px-6 animate-pulse">
+            <div className="py-10 md:py-14">
+                <div className="max-w-6xl mx-auto px-6 md:px-8 animate-pulse">
                     {/* Welcome header skeleton */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                         <div className="space-y-3">
@@ -184,16 +171,6 @@ export default function DashboardPage() {
                             <div className="h-4 w-72 bg-[var(--card-hover)] rounded-md" />
                         </div>
                         <div className="h-10 w-32 bg-[var(--border)] rounded-md" />
-                    </div>
-
-                    {/* Stats row skeleton */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                        {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="glass-card rounded-xl p-6 space-y-4">
-                                <div className="h-6 w-6 bg-[var(--border)] rounded-md" />
-                                <div className="h-8 w-16 bg-[var(--border)] rounded-md" />
-                            </div>
-                        ))}
                     </div>
 
                     {/* Event cards skeleton */}
@@ -212,48 +189,15 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="py-6">
-
-            <div className="max-w-6xl mx-auto px-6">
+        <div className="py-10 md:py-14">
+            <div className="max-w-6xl mx-auto px-6 md:px-8">
                 {/* Welcome + New Event + Inline Stats */}
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-10">
                     <div className="flex-1 min-w-0">
                         <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)] mb-2">
-                            Dashboard
+                            Events
                         </h1>
                         <p className="text-[15px] text-[var(--foreground-secondary)]">Manage your events and track attendee engagement.</p>
-                        
-                        {/* Inline Metrics Row */}
-                        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 mt-5 text-[13px]">
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <Calendar size={14} />
-                                <span className="font-medium text-[var(--foreground)]">{events.length}</span> Events
-                            </div>
-                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
-                            
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <ImageIcon size={14} />
-                                <span className="font-medium text-[var(--foreground)]">{totalPhotos.toLocaleString()}</span> Photos
-                            </div>
-                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
-                            
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <Users size={14} />
-                                <span className="font-medium text-[var(--foreground)]">{totalAttendees.toLocaleString()}</span> Guests
-                            </div>
-                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
-                            
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <Download size={14} />
-                                <span className="font-medium text-[var(--foreground)]">{totalDownloads.toLocaleString()}</span> Saves
-                            </div>
-                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
-                            
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <HardDrive size={14} />
-                                <span className="font-medium text-[var(--foreground)]">{totalSizeMB.toFixed(1)} MB</span> Storage
-                            </div>
-                        </div>
                     </div>
                     
                     <div className="flex items-center gap-3 shrink-0">
@@ -326,7 +270,7 @@ export default function DashboardPage() {
                                             {event.code}
                                         </span>
                                         <div
-                                            className="w-6 h-6 flex items-center justify-center rounded bg-[var(--border)] group-hover/copy:bg-zinc-700 transition-colors shrink-0"
+                                            className="w-6 h-6 flex items-center justify-center rounded bg-[var(--border)] group-hover/copy:bg-[var(--foreground-secondary)]/20 transition-colors shrink-0"
                                         >
                                             {copiedCode === event.code ? (
                                                 <Check size={12} className="text-emerald-500" />
@@ -475,7 +419,7 @@ export default function DashboardPage() {
                                     value={newEvent.name}
                                     onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
                                     placeholder="e.g. Tech Conference 2026"
-                                    className="w-full bg-[var(--card-hover)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500/50 transition-colors"
+                                    className="input-field"
                                     autoFocus
                                 />
                             </div>
@@ -486,7 +430,7 @@ export default function DashboardPage() {
                                     onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
                                     placeholder="Brief description of your event..."
                                     rows={3}
-                                    className="w-full bg-[var(--card-hover)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500/50 transition-colors resize-none"
+                                    className="input-field resize-none"
                                 />
                             </div>
                             <DatePicker
@@ -506,7 +450,7 @@ export default function DashboardPage() {
                                 <button
                                     type="submit"
                                     disabled={creating || !newEvent.name.trim()}
-                                    className="flex-1 px-4 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                                     {creating ? "Creating..." : "Create"}

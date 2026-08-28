@@ -109,9 +109,14 @@ export async function PUT(request: NextRequest, context: RouteContext) {
             return NextResponse.json({ err: "Not authorized" }, { status: 403 });
         }
 
+        const updateData: any = { ...validation.data };
+        if (updateData.date) {
+            updateData.date = new Date(updateData.date);
+        }
+
         const updated = await prisma.event.update({
             where: { id },
-            data: validation.data,
+            data: updateData,
         });
 
         return NextResponse.json({

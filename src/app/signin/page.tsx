@@ -15,7 +15,7 @@ export default function AuthPage() {
         if (status === "authenticated") {
             const role = session?.user?.role;
             if (role === "organizer") {
-                router.replace("/organizer/dashboard");
+                router.replace("/organizer/events");
             } else {
                 router.replace("/attendee/dashboard");
             }

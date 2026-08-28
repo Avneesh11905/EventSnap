@@ -13,7 +13,6 @@ import {
     CheckCircle2,
     AlertCircle,
     Upload,
-    Users,
     Image as ImageIcon,
     HardDrive,
     Copy,
@@ -81,8 +80,8 @@ export default function EventDetailsPage({
     const [showEditModal, setShowEditModal] = useState(false);
     const [editForm, setEditForm] = useState({ name: "", description: "", date: "" });
     const [editSaving, setEditSaving] = useState(false);
-    const [stickyVisible, setStickyVisible] = useState(false);
-    const headerRef = useRef<HTMLDivElement>(null);
+    
+    
 
     const copyCode = (code: string) => {
         navigator.clipboard.writeText(code);
@@ -131,18 +130,6 @@ export default function EventDetailsPage({
     useEffect(() => {
         clearSelection();
     }, [filter, clearSelection]);
-
-    // Sticky bar — show when the header scrolls out of view
-    useEffect(() => {
-        const check = () => {
-            const el = headerRef.current;
-            if (!el) return;
-            setStickyVisible(el.getBoundingClientRect().bottom < 80);
-        };
-        window.addEventListener("scroll", check, { passive: true });
-        check(); // run once on mount
-        return () => window.removeEventListener("scroll", check);
-    }, []);
 
     // Lightbox & Interaction State
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -260,7 +247,7 @@ export default function EventDetailsPage({
     const triggerBackendEncoding = async () => {
         if (!event) return;
         if (phase !== "idle" && phase !== "done" && phase !== "error") {
-            alert("An upload or encoding process is already running. Please wait for it to finish or cancel it before starting a new one.");
+            setError("An upload or encoding process is already running. Please wait for it to finish before starting a new one.");
             return;
         }
         try {
@@ -425,7 +412,7 @@ export default function EventDetailsPage({
             <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-5 bg-[var(--background)]">
                 <div className="max-w-sm w-full rounded-xl bg-[var(--card-hover)] border border-[var(--border)] p-8 text-center">
                     <p className="text-red-400 mb-6">{error}</p>
-                    <Link href="/organizer/dashboard" className="btn-primary inline-flex">Go Back</Link>
+                    <Link href="/organizer/events" className="btn-primary inline-flex">Go Back</Link>
                 </div>
             </div>
         );
@@ -438,53 +425,60 @@ export default function EventDetailsPage({
     return (
         <>
         <div 
-            className="min-h-[calc(100vh-4rem)] bg-[var(--background)] relative"
+            className="flex flex-col min-h-[calc(100vh-4rem)] bg-[var(--background)] relative w-full mx-auto"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
             {isDragging && (
-                <div className="absolute inset-0 z-[100] bg-blue-500/10 backdrop-blur-sm border-2 border-dashed border-blue-500 rounded-xl flex items-center justify-center pointer-events-none m-4">
-                    <div className="bg-[var(--card-hover)] text-[var(--foreground)] px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center">
-                        <Upload size={48} className="text-blue-500 mb-4" />
+                <div className="fixed inset-0 z-[100] bg-[var(--foreground)]/5 backdrop-blur-sm border-2 border-dashed border-[var(--foreground)]/30 flex items-center justify-center pointer-events-none">
+                    <div className="bg-[var(--card-bg)] border border-[var(--border)] text-[var(--foreground)] px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center">
+                        <Upload size={48} className="text-[var(--foreground-secondary)] mb-4" />
                         <h2 className="text-2xl font-bold mb-2">Drop Folder or Files Here</h2>
                         <p className="text-[var(--foreground-secondary)]">Drop to instantly add them to the queue</p>
                     </div>
                 </div>
             )}
-            {/* Sticky condensed toolbar */}
-            <div className={`fixed top-0 left-0 right-0 h-16 z-[70] transition-all duration-200 bg-[var(--background)] border-b border-[var(--border)] flex items-center ${stickyVisible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"}`}>
-                <div className="w-full mx-auto max-w-[1400px] px-6">
-                    <div className="flex items-center gap-4">
-                        {/* Event name + code */}
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <Link href="/organizer/dashboard" className="p-1.5 -ml-1.5 rounded-md hover:bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors">
-                                <ArrowLeft size={16} />
-                            </Link>
-                            <span className="text-[14px] font-semibold text-[var(--foreground)] truncate">{event?.name}</span>
-                            <button
-                                onClick={() => event && copyCode(event.code)}
-                                className="shrink-0 flex items-center gap-1 font-mono text-[11px] font-semibold bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded border border-sky-500/20 hover:bg-sky-500/20 transition-colors tracking-wider"
-                            >
-                                {event?.code}
-                                {copiedCode === event?.code ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} className="opacity-60" />}
-                            </button>
-                        </div>
 
+            {/* Permanent Sticky Top Navbar */}
+            <div className="sticky top-16 md:top-0 z-[40] bg-[var(--background-secondary)]/95 backdrop-blur-md border-b border-[var(--border)] px-6 md:px-8 h-14 flex items-center shadow-sm w-full mb-6">
+                <div className="flex-1 flex items-center gap-4 min-w-0 max-w-[1400px] mx-auto w-full">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <Link href="/organizer/events" className="p-1.5 -ml-1.5 rounded-md hover:bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors">
+                            <ArrowLeft size={16} />
+                        </Link>
+                        <span className="text-[15px] font-semibold text-[var(--foreground)] truncate">{event?.name}</span>
+                        <button
+                            onClick={() => event && copyCode(event.code)}
+                            className="shrink-0 flex items-center gap-1 font-mono text-[11px] font-semibold bg-[var(--card-hover)] text-[var(--foreground)] px-2 py-0.5 rounded border border-[var(--border)] hover:border-[var(--foreground-secondary)] transition-colors tracking-wider"
+                        >
+                            {event?.code}
+                            {copiedCode === event?.code ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} className="opacity-60" />}
+                        </button>
+                        <button
+                            onClick={openEditModal}
+                            className="shrink-0 p-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] border border-transparent hover:border-[var(--border)] transition-colors hidden sm:flex"
+                            title="Edit event details"
+                        >
+                            <Pencil size={14} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
                         {/* Tab switcher */}
-                        <div className="flex items-center bg-[var(--card-hover)] p-0.5 rounded-lg border border-[var(--border)] shrink-0">
+                        <div className="hidden sm:flex items-center bg-[var(--card-hover)] p-0.5 rounded-lg border border-[var(--border)] shrink-0">
                             <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => setFilter("all")}
                                 className={`text-[12px] font-medium px-3 py-1 rounded-md transition-all ${filter === "all" ? "bg-[var(--foreground)] text-[var(--background)] shadow-sm" : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"}`}>
                                 All Photos
                             </button>
                             <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => setFilter("no_faces")}
-                                className={`text-[12px] font-medium px-3 py-1 rounded-md transition-all ${filter === "no_faces" ? "bg-amber-400 text-amber-950 shadow-sm" : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"}`}>
+                                className={`text-[12px] font-medium px-3 py-1 rounded-md transition-all ${filter === "no_faces" ? "bg-red-500 text-white shadow-sm" : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"}`}>
                                 No-Face
                             </button>
                         </div>
 
                         {/* Select all / Clear */}
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="hidden md:flex items-center gap-1.5 shrink-0">
                             <button type="button" onPointerDown={e => e.stopPropagation()} onClick={handleSelectAll} disabled={wantsSelectAll}
                                 className="text-[12px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-all flex items-center gap-1 disabled:opacity-40">
                                 {wantsSelectAll ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
@@ -496,7 +490,18 @@ export default function EventDetailsPage({
                             </button>
                         </div>
 
-                        {/* Upload button */}
+                        <div className="h-6 w-px bg-[var(--border)] hidden sm:block mx-1"></div>
+
+                        {/* Action buttons */}
+                        {(event?.photo_count || 0) > 0 && typeof encodedCount === 'number' && encodedCount < (event?.photo_count || 0) && (phase === "idle" || phase === "done" || phase === "error") && (
+                            <button
+                                onClick={triggerBackendEncoding}
+                                className="px-3 py-1.5 rounded-lg font-medium text-[12px] transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm bg-[var(--card-hover)] hover:bg-[var(--border)] text-[var(--foreground)] border border-[var(--border)]"
+                            >
+                                <Cpu size={14} className="text-[var(--foreground-secondary)]" /> <span className="hidden lg:inline">Process</span>
+                            </button>
+                        )}
+                        <input id="upload-input" type="file" multiple accept="image/jpeg, image/png, image/webp" className="hidden" onChange={handleFileChange} />
                         <button
                             onClick={async () => {
                                 if ('showDirectoryPicker' in window) {
@@ -506,112 +511,6 @@ export default function EventDetailsPage({
                                         const files: File[] = [];
                                         const getFiles = async (dh: any) => {
                                             for await (const entry of dh.values()) {
-                                                if (entry.kind === 'file') {
-                                                    const file = await entry.getFile();
-                                                    if (!file.name.startsWith("._") && (file.type.startsWith("image/") || file.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))) files.push(file);
-                                                } else if (entry.kind === 'directory') await getFiles(entry);
-                                            }
-                                        };
-                                        await getFiles(dirHandle);
-                                        if (files.length > 0 && event) queueUpload(files, event);
-                                    } catch (err: any) {
-                                        if (err.name !== 'AbortError') document.getElementById("upload-input")?.click();
-                                    }
-                                } else {
-                                    document.getElementById("upload-input")?.click();
-                                }
-                            }}
-                            disabled={phase === "uploading" || phase === "extracting"}
-                            className={`shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1.5 transition-all ${(phase === "uploading" || phase === "extracting") ? "bg-[var(--card-hover)] text-[var(--foreground-secondary)] opacity-50 cursor-not-allowed border border-[var(--border)]" : "bg-sky-500 hover:bg-sky-400 text-white"}`}
-                        >
-                            <Upload size={13} /> Upload
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div className="container mx-auto px-6 py-8 relative">
-                <Link
-                    href="/organizer/dashboard"
-                    className="inline-flex items-center gap-1.5 text-[13px] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] mb-5 transition-colors w-fit font-medium"
-                >
-                    <ArrowLeft size={14} /> Back to Dashboard
-                </Link>
-
-                {/* Header: Event info + Actions */}
-                <div ref={headerRef} className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1.5">
-                            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)] truncate">{event?.name}</h1>
-                            <button 
-                                onClick={() => event && copyCode(event.code)}
-                                className="shrink-0 flex items-center gap-1.5 font-mono text-[12px] font-semibold bg-sky-500/10 text-sky-400 px-2.5 py-1 rounded-md border border-sky-500/20 hover:bg-sky-500/20 transition-colors tracking-wider" 
-                                title="Click to copy event code"
-                            >
-                                {event?.code}
-                                {copiedCode === event?.code ? (
-                                    <Check size={12} className="text-emerald-500" />
-                                ) : (
-                                    <Copy size={12} className="opacity-70" />
-                                )}
-                            </button>
-                            <button
-                                onClick={openEditModal}
-                                className="shrink-0 p-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] border border-transparent hover:border-[var(--border)] transition-colors"
-                                title="Edit event details"
-                            >
-                                <Pencil size={16} />
-                            </button>
-                        </div>
-                        <p className="text-[15px] text-[var(--foreground-secondary)]">
-                            {event?.description || "No description."}
-                            {event?.date && (
-                                <span className="ml-2 text-[13px] opacity-70">· {new Date(event.date).toLocaleDateString()}</span>
-                            )}
-                        </p>
-                        
-                        {/* Inline Metrics Row */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-[13px]">
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <ImageIcon size={15} />
-                                <span className="font-medium text-[var(--foreground)]">{photoCount.toLocaleString()}</span> Photos
-                            </div>
-                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <Cpu size={15} />
-                                <span className="font-medium text-[var(--foreground)]">{typeof encodedCount === 'number' ? encodedCount.toLocaleString() : "..."}</span> Encoded
-                            </div>
-                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <Users size={15} />
-                                <span className="font-medium text-[var(--foreground)]">{event?.attendeesAccessed?.length || 0}</span> Attendees
-                            </div>
-                            <div className="hidden sm:block w-1 h-1 rounded-full bg-[var(--border)]"></div>
-                            <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)]">
-                                <HardDrive size={15} />
-                                <span className="font-medium text-[var(--foreground)]">{(event?.total_size_mb || 0).toFixed(1)} MB</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                        <input
-                            id="upload-input"
-                            type="file"
-                            multiple
-                            accept="image/jpeg, image/png, image/webp"
-                            className="hidden"
-                            onChange={handleFileChange}
-                        />
-                        <button 
-                            onClick={async () => {
-                                if ('showDirectoryPicker' in window) {
-                                    try {
-                                        // @ts-ignore
-                                        const dirHandle = await window.showDirectoryPicker();
-                                        const files: File[] = [];
-                                        const getFiles = async (dirHandle: any) => {
-                                            for await (const entry of dirHandle.values()) {
                                                 if (entry.kind === 'file') {
                                                     const file = await entry.getFile();
                                                     if (!file.name.startsWith("._") && !file.name.startsWith("__MACOSX") && (file.type.startsWith("image/") || file.name.match(/\.(jpg|jpeg|png|webp|bmp|tiff)$/i))) {
@@ -635,82 +534,51 @@ export default function EventDetailsPage({
                                 } else {
                                     document.getElementById("upload-input")?.click();
                                 }
-                            }} 
-                            className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-sm ${
-                                (phase === "uploading" || phase === "extracting") 
-                                ? "bg-[var(--card-hover)] text-[var(--foreground-secondary)] opacity-50 cursor-not-allowed border border-[var(--border)]" 
-                                : "bg-sky-500 hover:bg-sky-400 text-white hover:shadow-sky-500/20 hover:shadow-lg"
-                            }`}
+                            }}
                             disabled={phase === "uploading" || phase === "extracting"}
+                            className={`shrink-0 px-3.5 py-1 rounded-md text-[12px] font-medium flex items-center gap-1.5 transition-all ${(phase === "uploading" || phase === "extracting") ? "bg-[var(--card-hover)] text-[var(--foreground-secondary)] opacity-50 cursor-not-allowed border border-[var(--border)]" : "btn-primary"}`}
                         >
-                            <Upload size={16} className={(phase === "uploading" || phase === "extracting") ? "" : "text-sky-100"} /> Upload Photos
-                        </button>
-
-                        {(event?.photo_count || 0) > 0 && typeof encodedCount === 'number' && encodedCount < (event?.photo_count || 0) && (phase === "idle" || phase === "done" || phase === "error") && (
-                            <button
-                                onClick={triggerBackendEncoding}
-                                className="px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-sm bg-[var(--card-hover)] hover:bg-[var(--border)] text-[var(--foreground)] border border-[var(--border)]"
-                            >
-                                <Cpu size={16} className="text-sky-400" /> Start Recognition
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Gallery Toolbar — hidden when sticky bar takes over */}
-                <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mt-4 border-b border-[var(--border)] transition-all duration-200 ${stickyVisible ? "opacity-0 pointer-events-none h-0 overflow-hidden pb-0 mt-0 border-none" : "opacity-100"}`}>
-                    
-                    {/* Segmented Control */}
-                    <div className="flex items-center bg-[var(--card-hover)] p-1 rounded-lg border border-[var(--border)]">
-                        <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={() => setFilter("all")}
-                            className={`text-sm font-medium px-4 py-1.5 rounded-md transition-all duration-200 ${
-                                filter === "all"
-                                    ? "bg-[var(--foreground)] text-[var(--background)] shadow-sm"
-                                    : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
-                            }`}
-                        >
-                            All Photos
-                        </button>
-                        <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={() => setFilter("no_faces")}
-                            className={`text-sm font-medium px-4 py-1.5 rounded-md transition-all duration-200 ${
-                                filter === "no_faces"
-                                    ? "bg-amber-400 text-amber-950 shadow-sm"
-                                    : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)]"
-                            }`}
-                        >
-                            No-Face Photos
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="text-[13px] font-medium px-3 py-1.5 rounded-md border border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={handleSelectAll}
-                            disabled={wantsSelectAll}
-                        >
-                            {wantsSelectAll ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                            {wantsSelectAll ? "Loading..." : "Select All"}
-                        </button>
-                        <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="text-[13px] font-medium px-3 py-1.5 rounded-md border border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            onClick={clearSelection}
-                            disabled={selectedKeys.size === 0}
-                        >
-                            Clear
+                            <Upload size={12} /> Upload
                         </button>
                     </div>
                 </div>
+            </div>
 
+            {/* Main Content Area */}
+            <div className="flex-1 w-full max-w-[1400px] mx-auto relative mb-12 px-6 md:px-8">
+                {/* Minimal Header Metrics Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <p className="text-[14px] text-[var(--foreground-secondary)] max-w-2xl leading-relaxed">
+                        {event?.description || "No description provided."}
+                        {event?.date && <span className="ml-2 text-[12px] opacity-70">· {new Date(event.date).toLocaleDateString()}</span>}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px]">
+                        <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)] bg-[var(--card-bg)] px-2.5 py-1 rounded-md border border-[var(--border)] shadow-sm">
+                            <ImageIcon size={13} />
+                            <span className="font-medium text-[var(--foreground)]">{photoCount.toLocaleString()}</span> Photos
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)] bg-[var(--card-bg)] px-2.5 py-1 rounded-md border border-[var(--border)] shadow-sm">
+                            <Cpu size={13} />
+                            <span className="font-medium text-[var(--foreground)]">{typeof encodedCount === 'number' ? encodedCount.toLocaleString() : "..."}</span> Encoded
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[var(--foreground-secondary)] bg-[var(--card-bg)] px-2.5 py-1 rounded-md border border-[var(--border)] shadow-sm">
+                            <HardDrive size={13} />
+                            <span className="font-medium text-[var(--foreground)]">{(event?.total_size_mb || 0).toFixed(1)} MB</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Mobile-only tools */}
+                <div className="flex sm:hidden flex-wrap items-center gap-2 mb-4">
+                    <div className="flex items-center bg-[var(--card-hover)] p-0.5 rounded-lg border border-[var(--border)]">
+                        <button type="button" onClick={() => setFilter("all")} className={`text-[12px] font-medium px-3 py-1 rounded-md ${filter === "all" ? "bg-[var(--foreground)] text-[var(--background)]" : ""}`}>All</button>
+                        <button type="button" onClick={() => setFilter("no_faces")} className={`text-[12px] font-medium px-3 py-1 rounded-md ${filter === "no_faces" ? "bg-red-500 text-white" : ""}`}>No-Face</button>
+                    </div>
+                    <button type="button" onClick={handleSelectAll} disabled={wantsSelectAll} className="text-[12px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] bg-[var(--card-bg)] flex items-center gap-1">
+                        {wantsSelectAll ? <Loader2 size={10} className="animate-spin" /> : null} Select All
+                    </button>
+                    <button type="button" onClick={clearSelection} disabled={selectedKeys.size === 0} className="text-[12px] font-medium px-2.5 py-1 rounded-md border border-[var(--border)] bg-[var(--card-bg)]">Clear</button>
+                </div>
                 {/* Gallery Grid */}
                 {isGalleryError ? (
                     <div className="flex h-64 items-center justify-center text-red-500">
@@ -736,7 +604,7 @@ export default function EventDetailsPage({
                                 onContextMenu={(e) => e.preventDefault()}
                                 className={`group relative aspect-square rounded-xl overflow-hidden cursor-pointer transition-all duration-200 select-none touch-callout-none touch-action-none ${
                                     selectedKeys.has(image.key)
-                                        ? "ring-2 ring-sky-500 ring-offset-2 ring-offset-[var(--background)] scale-[0.96] shadow-xl"
+                                        ? "ring-2 ring-[var(--foreground)] ring-offset-2 ring-offset-[var(--background)] scale-[0.96] shadow-xl"
                                         : "hover:ring-1 hover:ring-[var(--border)]"
                                 }`}
                                 style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
@@ -766,8 +634,8 @@ export default function EventDetailsPage({
                                     }`}
                                 >
                                     {selectedKeys.has(image.key) ? (
-                                        <div className="bg-sky-500 rounded-full shadow-lg ring-2 ring-background">
-                                            <CheckCircle2 className="h-6 w-6 text-white" />
+                                        <div className="bg-[var(--foreground)] rounded-full shadow-lg ring-2 ring-[var(--background)]">
+                                            <CheckCircle2 className="h-6 w-6 text-[var(--background)]" />
                                         </div>
                                     ) : (
                                         <div className="rounded-full shadow-sm bg-black/20 border-[1.5px] border-white/70 backdrop-blur-sm h-6 w-6 hover:bg-black/40 hover:border-white transition-colors"></div>
@@ -797,19 +665,15 @@ export default function EventDetailsPage({
 
                 {/* Floating Bulk Action Bar */}
                 {selectedKeys.size > 0 && (
-                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-900/60 border border-zinc-800 shadow-2xl rounded-full px-6 py-4 flex items-center gap-6 z-50 animate-in slide-in-from-bottom-10 text-white">
+                    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[var(--background)]/95 backdrop-blur border border-[var(--border)] shadow-2xl rounded-full px-6 py-4 flex items-center gap-6 z-50 animate-in slide-in-from-bottom-10 text-[var(--foreground)]">
                         <span className="font-medium whitespace-nowrap">
                             {selectedKeys.size} image{selectedKeys.size !== 1 ? "s" : ""} selected
                         </span>
 
                         <button
-                            className="bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-md transition-colors flex items-center disabled:opacity-50"
+                            className="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-md transition-colors flex items-center disabled:opacity-50"
                             disabled={isDeleting}
-                            onClick={() => {
-                                if (window.confirm(`Are you absolutely sure you want to delete ${selectedKeys.size} image${selectedKeys.size !== 1 ? "s" : ""}? This cannot be undone.`)) {
-                                    deleteSelected();
-                                }
-                            }}
+                            onClick={deleteSelected}
                         >
                             {isDeleting ? (
                                 <>
@@ -853,7 +717,7 @@ export default function EventDetailsPage({
                                 type="text"
                                 value={editForm.name}
                                 onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
-                                className="w-full bg-[var(--card-hover)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500/50 transition-colors"
+                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]/20 focus:border-[var(--foreground)]/50 transition-colors"
                                 placeholder="Event name"
                                 required
                                 autoFocus
@@ -868,7 +732,7 @@ export default function EventDetailsPage({
                                 onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
                                 onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleEditEvent(e as any); } }}
                                 rows={3}
-                                className="w-full bg-[var(--card-hover)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500/50 transition-colors resize-none"
+                                className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg px-3.5 py-2.5 text-[var(--foreground)] text-sm placeholder-[var(--foreground-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]/20 focus:border-[var(--foreground)]/50 transition-colors resize-none"
                                 placeholder="Optional description... (Ctrl+Enter to save)"
                             />
                         </div>
@@ -888,7 +752,7 @@ export default function EventDetailsPage({
                             <button
                                 type="submit"
                                 disabled={editSaving || !editForm.name.trim()}
-                                className="flex-1 px-4 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-1 btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {editSaving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : "Save Changes"}
                             </button>

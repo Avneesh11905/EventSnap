@@ -6,7 +6,7 @@ import Navbar from "@/components/custom/Navbar";
 import AuthModal from "@/components/custom/AuthModal";
 
 const HIDE_NAVBAR_ROUTES = [
-    "/organizer/upload",
+    "/organizer",
     "/signin",
 ];
 

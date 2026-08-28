@@ -41,22 +41,22 @@ export default function Navbar() {
 
     return (
         <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto px-6 h-16 grid grid-cols-3 items-center">
+            <div className="max-w-7xl mx-auto px-6 md:px-8 h-16 flex justify-between items-center gap-4">
                 {/* Left: Logo */}
-                <div className="flex items-center justify-start">
+                <div className="flex flex-1 items-center justify-start shrink-0">
                     <Link href="/" className="flex items-center group cursor-pointer select-none">
-                        <Image src="/logo2.png" alt="EventSnap Logo" width={240} height={80} className="dark:hidden h-16 w-auto object-contain" priority />
-                        <Image src="/logo1.png" alt="EventSnap Logo" width={240} height={80} className="hidden dark:block h-16 w-auto object-contain" priority />
+                        <Image src="/logo_text_light.webp" alt="EventSnap Logo" width={240} height={80} className="dark:hidden h-16 w-auto object-contain scale-[2] origin-left" priority />
+                        <Image src="/logo_text_dark.webp" alt="EventSnap Logo" width={240} height={80} className="hidden dark:block h-16 w-auto object-contain scale-[2] origin-left" priority />
                     </Link>
                 </div>
 
                 {/* Center: Nav Links (desktop) */}
-                <nav className="hidden md:flex items-center justify-center gap-1">
+                <nav className="hidden md:flex shrink-0 items-center justify-center gap-1">
                     {NAV_LINKS.map((link) => (
                         <Link
                             key={link.href}
                             href={link.href}
-                            className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer ${pathname === link.href
+                            className={`px-3.5 py-1.5 rounded-md text-[14px] font-medium transition-colors cursor-pointer ${pathname === link.href
                                 ? "text-[var(--foreground)] bg-[var(--card-hover)]"
                                 : "text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)]"
                                 }`}
@@ -67,26 +67,26 @@ export default function Navbar() {
                 </nav>
 
                 {/* Right: Auth / Actions */}
-                <div className="flex items-center justify-end gap-3">
+                <div className="flex flex-1 items-center justify-end gap-3 shrink-0">
                     <ThemeToggle />
                     {session ? (
-                        <div className="flex items-center gap-1">
+                        <div className="hidden md:flex items-center gap-1">
                             {isOrganizer && (
                                 <>
                                     <Link
-                                        href="/organizer/dashboard"
-                                        className="px-3 py-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer flex items-center gap-2 text-[13px] font-medium"
+                                        href="/organizer/events"
+                                        className="px-3.5 py-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer flex items-center gap-2 text-[14px] font-medium"
                                         title="Organizer Dashboard"
                                     >
-                                        <LayoutDashboard size={14} />
+                                        <LayoutDashboard size={16} />
                                         <span>Organizer</span>
                                     </Link>
                                     <Link
                                         href="/attendee/dashboard"
-                                        className="px-3 py-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer flex items-center gap-2 text-[13px] font-medium"
+                                        className="px-3.5 py-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer flex items-center gap-2 text-[14px] font-medium"
                                         title="Find My Photos"
                                     >
-                                        <ImageIcon size={14} />
+                                        <ImageIcon size={16} />
                                         <span>Attendee</span>
                                     </Link>
                                 </>
@@ -94,10 +94,10 @@ export default function Navbar() {
                             {!isOrganizer && (
                                 <Link
                                     href="/attendee/dashboard"
-                                    className="px-3 py-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer flex items-center gap-2 text-[13px] font-medium"
+                                    className="px-3.5 py-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer flex items-center gap-2 text-[14px] font-medium"
                                     title="Dashboard"
                                 >
-                                    <LayoutDashboard size={14} />
+                                    <LayoutDashboard size={16} />
                                     <span>Dashboard</span>
                                 </Link>
                             )}
@@ -106,17 +106,17 @@ export default function Navbar() {
 
                             {/* Profile */}
                             {session.user?.image ? (
-                                <div className="hidden sm:block ml-1 px-1 cursor-default">
+                                <div className="hidden sm:block ml-2 px-1 cursor-default">
                                     <Image
                                         src={session.user.image}
                                         alt=""
-                                        width={24}
-                                        height={24}
-                                        className="w-6 h-6 rounded-full border border-[var(--border)]"
+                                        width={28}
+                                        height={28}
+                                        className="w-7 h-7 rounded-full border border-[var(--border)]"
                                     />
                                 </div>
                             ) : (
-                                <div className="hidden sm:flex ml-1 w-6 h-6 rounded-full bg-[var(--card-bg)] border border-[var(--border)] items-center justify-center text-[10px] font-medium text-[var(--foreground)] cursor-default">
+                                <div className="hidden sm:flex ml-2 w-7 h-7 rounded-full bg-[var(--card-bg)] border border-[var(--border)] items-center justify-center text-[11px] font-medium text-[var(--foreground)] cursor-default">
                                     {initials}
                                 </div>
                             )}
@@ -126,12 +126,12 @@ export default function Navbar() {
                                 className="hidden sm:block p-1.5 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer ml-1"
                                 title="Sign Out"
                             >
-                                <LogOut size={14} />
+                                <LogOut size={16} />
                             </button>
                         </div>
                     ) : (
                         <div className="hidden md:flex items-center gap-4">
-                            <button onClick={() => router.push("?auth=login")} className="h-9 px-5 inline-flex items-center justify-center rounded-md bg-[var(--primary)] hover:bg-[var(--accent)] text-white text-[13px] font-medium transition-colors cursor-pointer shadow-sm">
+                            <button onClick={() => router.push("?auth=login")} className="btn-primary h-9 px-5 inline-flex items-center justify-center gap-2">
                                 Log in
                             </button>
                         </div>
@@ -167,7 +167,7 @@ export default function Navbar() {
                             <div className="pt-2 pb-2">
                                 {isOrganizer && (
                                     <Link
-                                        href="/organizer/dashboard"
+                                        href="/organizer/events"
                                         className="block px-4 py-2.5 rounded-md text-[14px] font-medium text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-hover)] transition-colors cursor-pointer"
                                     >
                                         Organizer Dashboard
@@ -195,7 +195,7 @@ export default function Navbar() {
                                 <div className="space-y-3">
                                     <button
                                         onClick={() => { setMobileOpen(false); router.push("?auth=login"); }}
-                                        className="block w-full text-center py-2.5 rounded-md text-[14px] font-medium bg-[var(--primary)] hover:bg-[var(--accent)] transition-colors text-white"
+                                        className="btn-primary block w-full text-center py-2.5"
                                     >
                                         Log in
                                     </button>

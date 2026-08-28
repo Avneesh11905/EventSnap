@@ -57,14 +57,14 @@ export default function GalleryPage({
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">
             <Link
-              href={`/organizer/dashboard`}
+              href={`/organizer/events`}
               className="inline-flex items-center gap-1.5 text-[13px] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors w-fit font-medium"
             >
               <ArrowLeft size={14} /> Back to Dashboard
             </Link>
             <Link
               href={`/organizer/events/${eventId}`}
-              className="inline-flex items-center gap-1.5 text-[13px] text-sky-400 hover:text-sky-300 transition-colors w-fit font-medium ml-auto"
+              className="inline-flex items-center gap-1.5 text-[13px] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors w-fit font-medium ml-auto"
             >
               Upload More Photos
             </Link>
@@ -76,13 +76,13 @@ export default function GalleryPage({
             </div>
           <div className="space-x-4">
             <button
-              className="bg-[var(--card-hover)] border border-[var(--border)] hover:border-zinc-500 text-[var(--foreground)] px-4 py-2 rounded-md font-medium text-sm transition-colors"
+              className="bg-[var(--card-hover)] border border-[var(--border)] hover:border-[var(--foreground-secondary)] text-[var(--foreground)] px-4 py-2 rounded-md font-medium text-sm transition-colors"
               onClick={handleSelectAll}
             >
               Select All Loaded
             </button>
             <button
-              className="bg-[var(--card-hover)] border border-[var(--border)] hover:border-zinc-500 text-[var(--foreground)] px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 disabled:hover:border-[var(--border)]"
+              className="bg-[var(--card-hover)] border border-[var(--border)] hover:border-[var(--foreground-secondary)] text-[var(--foreground)] px-4 py-2 rounded-md font-medium text-sm transition-colors disabled:opacity-50 disabled:hover:border-[var(--border)]"
               onClick={clearSelection}
               disabled={selectedKeys.size === 0}
             >
@@ -152,19 +152,15 @@ export default function GalleryPage({
 
         {/* Floating Bulk Action Bar */}
         {selectedKeys.size > 0 && (
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-900/60 border border-zinc-800 shadow-2xl rounded-full px-6 py-4 flex items-center gap-6 z-50 animate-in slide-in-from-bottom-10 text-white">
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[var(--background)]/95 backdrop-blur border border-[var(--border)] shadow-2xl rounded-full px-6 py-4 flex items-center gap-6 z-50 animate-in slide-in-from-bottom-10 text-[var(--foreground)]">
             <span className="font-medium whitespace-nowrap">
               {selectedKeys.size} image{selectedKeys.size !== 1 ? "s" : ""} selected
             </span>
 
             <button
-              className="bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-md transition-colors flex items-center disabled:opacity-50"
+              className="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-md transition-colors flex items-center disabled:opacity-50"
               disabled={isDeleting}
-              onClick={() => {
-                if (window.confirm(`Are you absolutely sure you want to delete ${selectedKeys.size} image${selectedKeys.size !== 1 ? "s" : ""}? This cannot be undone.`)) {
-                  deleteSelected();
-                }
-              }}
+              onClick={deleteSelected}
             >
               {isDeleting ? (
                 <>

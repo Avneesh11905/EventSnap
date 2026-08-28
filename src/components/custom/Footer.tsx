@@ -11,9 +11,9 @@ export function Footer() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 mb-16">
                     {/* Brand Column */}
                     <div className="lg:col-span-2">
-                        <Link href="/" className="flex items-center group mb-6 inline-flex select-none">
-                            <Image src="/logo2.png" alt="EventSnap Logo" width={280} height={80} className="dark:hidden h-16 w-auto object-contain" priority />
-                            <Image src="/logo1.png" alt="EventSnap Logo" width={280} height={80} className="hidden dark:block h-16 w-auto object-contain" priority />
+                        <Link href="/" className="items-center group mb-6 inline-flex select-none">
+                            <Image src="/logo_text_light.webp" alt="EventSnap Logo" width={280} height={80} className="dark:hidden h-20 w-auto object-contain scale-[2] origin-left" priority />
+                            <Image src="/logo_text_dark.webp" alt="EventSnap Logo" width={280} height={80} className="hidden dark:block h-20 w-auto object-contain scale-[2] origin-left" priority />
                         </Link>
                         <p className="text-[15px] text-[var(--foreground-secondary)] max-w-sm mb-6 leading-relaxed">
                             Find the moments you were part of. Advanced facial recognition for event photography delivery.

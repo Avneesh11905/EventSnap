@@ -189,7 +189,7 @@ export default function AttendeeEventDetail() {
     }
 
     return (
-        <div className="min-h-screen px-4 py-12 max-w-5xl mx-auto bg-[var(--background)]">
+        <div className="min-h-screen px-6 md:px-8 py-10 md:py-14 max-w-5xl mx-auto bg-[var(--background)]">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 mb-10">
                 <div>
@@ -238,7 +238,7 @@ export default function AttendeeEventDetail() {
                                 </div>
                                 <div className="w-full h-1 bg-[var(--border)] rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-zinc-100 transition-all duration-500"
+                                        className="h-full bg-[var(--foreground)] transition-all duration-500"
                                         style={{ width: `${parseInt(downloadProgress?.match(/\d+/)?.[0] || '0')}%` }}
                                     />
                                 </div>
@@ -277,13 +277,13 @@ export default function AttendeeEventDetail() {
                     {photos.map((photo, i) => (
                         <div
                             key={i}
-                            className="relative group rounded-md overflow-hidden aspect-square cursor-pointer ring-1 ring-zinc-800 hover:ring-zinc-600 transition-all bg-[var(--card-hover)]"
+                            className="relative group rounded-md overflow-hidden aspect-square cursor-pointer ring-1 ring-[var(--border)] hover:ring-[var(--foreground-secondary)] transition-all bg-[var(--card-hover)]"
                             onClick={() => setLightboxIndex(i)}
                         >
                             {/* Skeleton placeholder */}
                             {!loadedImages.has(i) && (
                                 <div className="absolute inset-0 bg-[var(--border)] animate-pulse flex items-center justify-center">
-                                    <ImageIcon size={24} className="text-zinc-700" />
+                                    <ImageIcon size={24} className="text-[var(--foreground-secondary)] opacity-30" />
                                 </div>
                             )}
                             <Image
@@ -313,7 +313,7 @@ export default function AttendeeEventDetail() {
                     <p className="text-[14px] text-[var(--foreground-secondary)] max-w-sm mx-auto">
                         The sort results may have expired or no faces matched. Try scanning the event again.
                     </p>
-                    <Link href="/attendee/sort" className="btn-primary inline-flex items-center gap-2 mt-8">
+                    <Link href="/attendee/dashboard" className="btn-primary mx-auto inline-flex items-center gap-2 mt-8 w-fit">
                         <ScanFace size={16} /> Re-scan Event
                     </Link>
                 </div>

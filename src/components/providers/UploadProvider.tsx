@@ -219,7 +219,6 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const listenEncodingStream = (taskId: string, eventId: string) => {
-        if (sessionStatus !== "authenticated") return;
         setUploadingEventId(eventId);
         setPhase("encoding");
         setEncodeProgress(0);
@@ -274,11 +273,19 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
             eventSource.close();
         });
 
-        eventSource.onerror = () => {
+        eventSource.onerror = (err) => {
             if (isDone) return;
+            
+            // If it's just trying to reconnect, don't kill it
+            if (eventSource.readyState === EventSource.CONNECTING) {
+                setStatusMessage("Reconnecting to server...");
+                return;
+            }
+
             setErrorMessage("Connection to processing server lost.");
             setPhase("error");
-            localStorage.removeItem("eventsnap_active_upload");
+            // DO NOT wipe local storage here. If the user refreshes the page, 
+            // the EventSource closes, and wiping it here prevents restoration on reload.
             eventSource.close();
         };
     };
@@ -681,13 +688,13 @@ function PreUploadModal({
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-[#0f0f11] border border-zinc-800 rounded-2xl p-6 w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl p-6 w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-xl font-bold text-white tracking-tight">Upload Photos</h2>
-                        <p className="text-sm text-zinc-400 mt-1">To event <span className="font-medium text-zinc-300">{event.name}</span></p>
+                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">Upload Photos</h2>
+                        <p className="text-sm text-[var(--foreground-secondary)] mt-1">To event <span className="font-medium text-[var(--foreground)]">{event.name}</span></p>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-colors">
+                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors">
                         <X size={20} />
                     </button>
                 </div>
@@ -695,7 +702,7 @@ function PreUploadModal({
                 <div className="flex-1 overflow-y-auto min-h-0 pr-2">
                     <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-4">
                         {previewFiles.map((file, i) => (
-                            <div key={i} className="aspect-square relative rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900">
+                            <div key={i} className="aspect-square relative rounded-lg border border-[var(--border)] overflow-hidden bg-[var(--background-secondary)]">
                                 <img
                                     src={URL.createObjectURL(file)}
                                     alt="Preview"
@@ -705,28 +712,28 @@ function PreUploadModal({
                             </div>
                         ))}
                         {files.length > 12 && (
-                            <div className="aspect-square relative rounded-lg border border-zinc-800 bg-zinc-900 flex items-center justify-center">
-                                <span className="text-sm font-medium text-zinc-400">+{files.length - 12}</span>
+                            <div className="aspect-square relative rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] flex items-center justify-center">
+                                <span className="text-sm font-medium text-[var(--foreground-secondary)]">+{files.length - 12}</span>
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <label className="flex items-center gap-2.5 cursor-pointer text-sm text-zinc-400 font-medium hover:text-zinc-300 transition-colors">
+                <div className="mt-6 pt-6 border-t border-[var(--border)] flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <label className="flex items-center gap-2.5 cursor-pointer text-sm text-[var(--foreground-secondary)] font-medium hover:text-[var(--foreground)] transition-colors">
                         <input 
                             type="checkbox" 
                             checked={autoStartRecognition} 
                             onChange={(e) => setAutoStartRecognition(e.target.checked)} 
-                            className="rounded border-zinc-700 bg-zinc-900 text-sky-500 focus:ring-sky-500 w-4 h-4 cursor-pointer"
+                            className="rounded border-[var(--border)] bg-[var(--background-secondary)] text-[var(--primary)] focus:ring-[var(--primary)] w-4 h-4 cursor-pointer"
                         />
                         Automatically start AI recognition
                     </label>
                     <div className="flex gap-3 w-full sm:w-auto">
-                        <button onClick={onClose} className="flex-1 sm:flex-none px-4 py-2 rounded-md font-medium text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-800 transition-colors">
+                        <button onClick={onClose} className="btn-premium">
                             Cancel
                         </button>
-                        <button onClick={onConfirm} className="flex-1 sm:flex-none px-6 py-2 rounded-md font-medium text-sm bg-sky-500 hover:bg-sky-400 text-white shadow-lg transition-colors flex items-center justify-center gap-2">
+                        <button onClick={onConfirm} className="btn-primary">
                             Upload {files.length} {files.length === 1 ? 'Photo' : 'Photos'}
                         </button>
                     </div>
@@ -757,7 +764,7 @@ function UploadWidget() {
         return (
             <div
                 onClick={maximizeWidget}
-                className="fixed bottom-6 right-6 z-50 glass rounded-full px-4 py-2 cursor-pointer shadow-xl hover:bg-white/5 transition flex items-center gap-3 animate-slide-up"
+                className="fixed bottom-6 right-6 z-50 glass rounded-full px-4 py-2 cursor-pointer shadow-xl hover:bg-[var(--card-hover)] transition flex items-center gap-3 animate-slide-up"
             >
                 {phase === "uploading" ? (
                     <Loader2 size={16} className="animate-spin text-sky-400" />
@@ -778,31 +785,31 @@ function UploadWidget() {
     }
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 w-[340px] glass-card rounded-2xl shadow-2xl border border-white/10 overflow-hidden animate-slide-up">
-            <div className="p-4 flex items-center justify-between border-b border-white/5 bg-white/[0.02]">
+        <div className="fixed bottom-6 right-6 z-50 w-[340px] glass-card rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden animate-slide-up">
+            <div className="p-4 flex items-center justify-between border-b border-[var(--border)] bg-[var(--card-bg)]">
                 <div className="flex-1 min-w-0 pr-4">
-                    <h4 className="font-semibold text-[13px] text-white/90 truncate">
+                    <h4 className="font-semibold text-[13px] text-[var(--foreground)] truncate">
                         {phase === "uploading" ? "Uploading Photos" : "AI Face Recognition"}
                     </h4>
                     <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="relative flex h-1.5 w-1.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-500"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 text-[var(--primary)] bg-[var(--primary)]"></span>
                         </span>
-                        <p className="text-[10px] text-white/40 truncate font-medium tracking-tight">{statusMessage}</p>
+                        <p className="text-[10px] text-[var(--foreground-secondary)] truncate font-medium tracking-tight">{statusMessage}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                     <button
                         onClick={minimizeWidget}
-                        className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors"
                         aria-label="Minimize"
                     >
                         <Minus size={14} />
                     </button>
                     <button
                         onClick={dismissWidget}
-                        className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-[var(--card-hover)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors"
                         aria-label="Dismiss"
                     >
                         <X size={14} />
@@ -826,17 +833,17 @@ function UploadWidget() {
                         </div>
                         <div>
                             <p className="text-sm font-medium text-emerald-400">All tasks complete!</p>
-                            <p className="text-[11px] text-white/30">Your photos are ready.</p>
+                            <p className="text-[11px] text-[var(--foreground-secondary)]">Your photos are ready.</p>
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         <div className="flex justify-between items-end mb-1">
                             <div className="flex items-baseline gap-1.5">
-                                <span className="text-lg font-bold tabular-nums text-white/90">
+                                <span className="text-lg font-bold tabular-nums text-[var(--foreground)]">
                                     {phase === "uploading" ? progress : encodeProgress}
                                 </span>
-                                <span className="text-[11px] font-medium text-white/30 uppercase tracking-wider">%</span>
+                                <span className="text-[11px] font-medium text-[var(--foreground-secondary)] uppercase tracking-wider">%</span>
                             </div>
                             {phase === "uploading" ? (
                                 <button
@@ -855,7 +862,7 @@ function UploadWidget() {
                             ) : null}
                         </div>
 
-                        <div className="h-2 bg-white/[0.03] rounded-full overflow-hidden border border-white/5 p-[1px]">
+                        <div className="h-2 bg-[var(--card-hover)] rounded-full overflow-hidden border border-[var(--border)] p-[1px]">
                             <div
                                 className={`h-full rounded-full transition-all duration-500 ease-out shadow-[0_0_12px_rgba(0,0,0,0.5)] ${phase === "uploading" ? "bg-gradient-to-r from-sky-600 to-sky-400" :
                                     phase === "extracting" ? "bg-amber-500 w-full animate-pulse" :

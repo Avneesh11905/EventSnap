@@ -39,7 +39,7 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
                 const sessionData = sessionRes.data;
                 
                 if (sessionData?.user?.role === "organizer") {
-                    window.location.href = "/organizer/dashboard";
+                    window.location.href = "/organizer/events";
                 } else {
                     window.location.href = "/attendee/dashboard";
                 }
@@ -55,7 +55,8 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
         <div className="w-full flex flex-col items-center">
             {/* Header */}
             <div className="flex items-center justify-center mb-6 select-none">
-                <Image src="/logo1.png" alt="EventSnap Logo" width={280} height={80} className="h-16 w-auto object-contain" priority />
+                <Image src="/logo_text_light.webp" alt="EventSnap Logo" width={280} height={80} className="dark:hidden h-20 w-auto object-contain scale-[2]" priority />
+                <Image src="/logo_text_dark.webp" alt="EventSnap Logo" width={280} height={80} className="hidden dark:block h-20 w-auto object-contain scale-[2]" priority />
             </div>
             
             <div className="text-center mb-6">
@@ -184,7 +185,7 @@ export default function AuthForm({ onSuccess }: { onSuccess?: () => void }) {
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-11 bg-[var(--primary)] hover:bg-[var(--accent)] text-white font-semibold rounded-lg text-[14px] flex items-center justify-center gap-2 transition-colors disabled:opacity-70 mt-5 shadow-sm"
+                    className="btn-primary w-full h-11 flex items-center justify-center gap-2 mt-5"
                 >
                     {isSubmitting ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
