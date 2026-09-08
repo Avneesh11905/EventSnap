@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { apiClient } from "@/lib/axios";
 
-const MAIN_API_URL = process.env.NEXT_PUBLIC_INFERENCE_API_URL || "http://localhost:8000";
+const MAIN_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 // GET /api/upload/status?taskId=xxx — proxy encoding progress from main_api
 export async function GET(req: NextRequest) {

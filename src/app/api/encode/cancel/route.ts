@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ err: "Forbidden" }, { status: 403 });
         }
 
-        const pythonBackendUrl = process.env.NEXT_PUBLIC_INFERENCE_BACKEND_URL || "http://localhost:8000";
+        const pythonBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
         const cancelRes = await fetch(`${pythonBackendUrl}/api/events/cancel-encoding/${event.code}`, {
             method: "POST"
         });

@@ -212,7 +212,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
         //  ML Backend Table & Storage Cleanup (Async)
         try {
-            const modelUrl = process.env.NEXT_PUBLIC_INFERENCE_API_URL || 'http://localhost:8000';
+            const modelUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
             // Backend celery task handles pgvector delete + S3 folder wipe
             await apiClient.delete(`${modelUrl}/api/events/delete-event-data/${event.code}?event_id=${id}`);
         } catch (mlErr) {

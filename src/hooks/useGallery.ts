@@ -85,7 +85,7 @@ export function useGallery(eventId: string) {
       const { task_id } = await res.json();
       
       // Step B: Listen to SSE stream
-      const backendUrl = process.env.NEXT_PUBLIC_INFERENCE_BACKEND_URL || "http://localhost:8000";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
       const eventSource = new EventSource(`${backendUrl}/api/tasks/stream?taskId=${task_id}`);
 
       eventSource.addEventListener("message", (e) => {

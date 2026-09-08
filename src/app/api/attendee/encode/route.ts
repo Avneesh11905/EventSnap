@@ -7,7 +7,7 @@ import { apiClient } from "@/lib/axios";
 
 export const dynamic = "force-dynamic";
 
-const MAIN_API_URL = process.env.NEXT_PUBLIC_INFERENCE_API_URL || "http://localhost:8000";
+const MAIN_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 // POST /api/attendee/encode — Send 3 face images to backend, store encodings
 export async function POST(req: NextRequest) {

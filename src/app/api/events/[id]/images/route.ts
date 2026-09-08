@@ -57,7 +57,7 @@ export async function GET(
             ContinuationToken: cursor || undefined,
         }));
 
-        const pythonBackendUrl = process.env.NEXT_PUBLIC_INFERENCE_BACKEND_URL || "http://localhost:8000";
+        const pythonBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
         let statusMap: { no_faces: string[], has_faces: string[] } = { no_faces: [], has_faces: [] };
         
         try {
@@ -144,7 +144,7 @@ export async function DELETE(
             return NextResponse.json({ err: "No keys provided for deletion." }, { status: 400 });
         }
 
-        const pythonBackendUrl = process.env.NEXT_PUBLIC_INFERENCE_BACKEND_URL || "http://localhost:8000";
+        const pythonBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
         const deleteRes = await fetch(`${pythonBackendUrl}/api/images/delete-bulk`, {
             method: "POST",
             headers: {

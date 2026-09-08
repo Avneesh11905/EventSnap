@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Proxy the call to the main_api server-side (no CORS issues)
-        const MAIN_API_URL = process.env.NEXT_PUBLIC_INFERENCE_API_URL || "http://localhost:8000";
+        const MAIN_API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
         const encodeRes = await apiClient.post(`${MAIN_API_URL}/api/events/encode-event/`, {
             event_code: event.code 

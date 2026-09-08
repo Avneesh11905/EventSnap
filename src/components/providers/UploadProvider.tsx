@@ -229,7 +229,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("eventsnap_active_upload", JSON.stringify({ taskId, eventId }));
 
         // Use EventSource instead of setInterval
-        const backendUrl = process.env.NEXT_PUBLIC_INFERENCE_BACKEND_URL || "http://localhost:8000";
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
         const eventSource = new EventSource(`${backendUrl}/api/tasks/stream?taskId=${taskId}`);
         
         // Save to pollRef just so it can be cleaned up on unmount
