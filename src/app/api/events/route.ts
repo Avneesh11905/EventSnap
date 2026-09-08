@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
             data: {
                 name: validation.data.name,
                 description: validation.data.description || "",
-                date: validation.data.date ? new Date(validation.data.date) : null,
+                date: validation.data.date ? new Date(validation.data.date).toISOString() : null,
                 code,
                 owner_id: user.id,
                 status: "active",

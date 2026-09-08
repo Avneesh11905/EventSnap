@@ -11,8 +11,9 @@ export const createEventSchema = z.object({
         .string()
         .max(500, "Description must be under 500 characters")
         .trim()
-        .optional(),
-    date: z.string().optional(),
+        .optional()
+        .nullable(),
+    date: z.string().optional().nullable(),
 });
 
 export const updateEventSchema = z.object({
@@ -26,8 +27,9 @@ export const updateEventSchema = z.object({
         .string()
         .max(500, "Description must be under 500 characters")
         .trim()
-        .optional(),
-    date: z.string().optional(),
+        .optional()
+        .nullable(),
+    date: z.string().optional().nullable(),
     status: z.enum(["draft", "active", "archived"]).optional(),
 });
 

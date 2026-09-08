@@ -110,8 +110,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         }
 
         const updateData: any = { ...validation.data };
-        if (updateData.date) {
-            updateData.date = new Date(updateData.date);
+        if (updateData.date !== undefined) {
+            updateData.date = updateData.date ? new Date(updateData.date).toISOString() : null;
         }
 
         const updated = await prisma.event.update({

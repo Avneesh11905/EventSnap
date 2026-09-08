@@ -107,8 +107,8 @@ export default function EventDetailsPage({
         try {
             const res = await apiClient.put(`/api/events/${event.id}`, {
                 name: editForm.name.trim(),
-                description: editForm.description.trim() || undefined,
-                date: editForm.date || undefined,
+                description: editForm.description.trim() || null,
+                date: editForm.date || null,
             });
             if (res.data.success) {
                 setEvent(prev => prev ? {
